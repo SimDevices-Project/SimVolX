@@ -87,7 +87,6 @@ typedef struct {
 #define STATE_ERROR  0xFF
 
 void HIDCONFIG_Receive_Handler();
-void SP_INPUT_OnDataUpdate_Handler();
 
 extern uint8_t HIDCFG_Buffer_OUT[64];
 extern uint8_t HIDCFG_Buffer_IN[64];

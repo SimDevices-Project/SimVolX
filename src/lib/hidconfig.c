@@ -38,10 +38,6 @@ void HIDCONFIG_Get_SerialNumber(uint8_t *buf)
   buf[8]  = ((Device_Serial2 >> 24) & 0xFF);
 }
 
-void SP_INPUT_OnDataUpdate_Handler()
-{
-}
-
 void HIDCONFIG_Receive_Handler()
 {
   switch (dataReceive->reportID) {
