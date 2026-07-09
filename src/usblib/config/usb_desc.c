@@ -191,12 +191,12 @@ xdata_rodata const uint8_t USBD_StringLangID[USBD_SIZE_STRING_LANGID] = {
 xdata_rodata const uint8_t USBD_StringVendor[USBD_SIZE_STRING_VENDOR] = {
     USBD_SIZE_STRING_VENDOR,
     USB_STRING_DESCRIPTOR_TYPE,
-    'S', 0, 'E', 0, 'G', 0, 'A', 0};
+    'S', 0, 'i', 0, 'm', 0, 'D', 0, 'e', 0, 'v', 0, 'i', 0, 'c', 0, 'e', 0, 's', 0};
 
 xdata_rodata const uint8_t USBD_StringProduct[USBD_SIZE_STRING_PRODUCT] = {
     USBD_SIZE_STRING_PRODUCT,
     USB_STRING_DESCRIPTOR_TYPE,
-    0x53, 0x00, 0x69, 0x00, 0x6d, 0x00, 0x47, 0x00, 0x45, 0x00, 0x4b, 0x00, 0x49, 0x00, 0x20, 0x00, 0x43, 0x00, 0x6f, 0x00, 0x6e, 0x00, 0x74, 0x00, 0x72, 0x00, 0x6f, 0x00, 0x6c, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x72, 0x00};
+    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0, 'C', 0, 'o', 0, 'n', 0, 't', 0, 'r', 0, 'o', 0, 'l', 0, 'l', 0, 'e', 0, 'r', 0};
 
 xdata_rodata const uint8_t USBD_StringProduct_zh_hans[USBD_SIZE_STRING_PRODUCT_zh_hans] = {
     USBD_SIZE_STRING_PRODUCT_zh_hans,
@@ -206,9 +206,8 @@ xdata_rodata const uint8_t USBD_StringProduct_zh_hans[USBD_SIZE_STRING_PRODUCT_z
 uint8_t USBD_StringSerial[USBD_SIZE_STRING_SERIAL] = {
     USBD_SIZE_STRING_SERIAL,
     USB_STRING_DESCRIPTOR_TYPE,
-    '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0,
-    '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0,
-};
+    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0,
+    0x38, 0x6E, 0x0F, 0x62, 0xA7, 0x63, 0x36, 0x52, 0x68, 0x56};
 
 xdata_rodata const uint8_t USBD_StringConfig[USBD_SIZE_STRING_CONFIG] = {
     USBD_SIZE_STRING_CONFIG,
@@ -218,30 +217,17 @@ xdata_rodata const uint8_t USBD_StringConfig[USBD_SIZE_STRING_CONFIG] = {
 xdata_rodata const uint8_t USBD_StringHIDIO[USBD_SIZE_STRING_HIDIO] = {
     USBD_SIZE_STRING_HIDIO,
     USB_STRING_DESCRIPTOR_TYPE,
-    'I', 0, '/', 0, 'O', 0, ' ', 0, 'C', 0, 'O', 0, 'N', 0, 'T', 0, 'R', 0, 'O', 0, 'L', 0, ' ', 0, 'B', 0, 'D', 0, ';', 0,
-    '1', 0, '5', 0, '2', 0, '5', 0, '7', 0, ';', 0,
-    '0', 0, '1', 0, ';', 0,
-    '9', 0, '0', 0, ';', 0,
-    '1', 0, '8', 0, '3', 0, '1', 0, ';', 0,
-    '6', 0, '6', 0, '7', 0, '9', 0, 'A', 0, ';',
-    0, '0', 0, '0', 0, ';', 0,
-
-    'G', 0, 'O', 0, 'U', 0, 'T', 0, '=', 0, '1', 0, '4', 0, '_', 0,
-    'A', 0, 'D', 0, 'I', 0, 'N', 0, '=', 0, '8', 0, ',', 0, 'E', 0, '_', 0,
-    'R', 0, 'O', 0, 'T', 0, 'I', 0, 'N', 0, '=', 0, '4', 0, '_', 0,
-    'C', 0, 'O', 0, 'I', 0, 'N', 0, 'I', 0, 'N', 0, '=', 0, '2', 0, '_', 0,
-    'S', 0, 'W', 0, 'I', 0, 'N', 0, '=', 0, '2', 0, ',', 0, 'E', 0, '_', 0,
-    'U', 0, 'Q', 0, '1', 0, '=', 0, '4', 0, '1', 0, ',', 0, '6', 0};
+    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0, 'I', 0, 'n', 0, 'p', 0, 'u', 0, 't', 0};
 
 xdata_rodata const uint8_t USBD_StringCustomHID[USBD_SIZE_STRING_CUSTOM_HID] = {
     USBD_SIZE_STRING_CUSTOM_HID,
     USB_STRING_DESCRIPTOR_TYPE,
-    'S', 0, 'i', 0, 'm', 0, 'G', 0, 'E', 0, 'K', 0, 'I', 0, ' ', 0, 'C', 0, 'o', 0, 'n', 0, 'f', 0, 'i', 0, 'g', 0};
+    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0, 'C', 0, 'o', 0, 'n', 0, 'f', 0, 'i', 0, 'g', 0};
 
 xdata_rodata const uint8_t USBD_StringCustomHID_zh_hans[USBD_SIZE_STRING_CUSTOM_HID_zh_hans] = {
     USBD_SIZE_STRING_CUSTOM_HID_zh_hans,
     USB_STRING_DESCRIPTOR_TYPE,
-    0x53, 0x00, 0x69, 0x00, 0x6d, 0x00, 0x47, 0x00, 0x45, 0x00, 0x4b, 0x00, 0x49, 0x00, 0xbe, 0x8b, 0x6e, 0x7f};
+    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0, 'C', 0, 'o', 0, 'n', 0, 'f', 0, 'i', 0, 'g', 0};
 
 /* HID Report Descriptor for EP1 (Joystick) */
 xdata_rodata const uint8_t USBD_HidRepDesc[USBD_SIZE_REPORT_DESC] =
@@ -452,16 +438,6 @@ xdata void _IntToUnicode(uint32_t value, uint8_t *pbuf, uint8_t len)
 
 xdata void USBD_SerialNumUpdate()
 {
-  uint32_t Device_Serial0, Device_Serial1, Device_Serial2;
-  Device_Serial0 = *(uint32_t *)0x1FFFF7E8;
-  Device_Serial1 = *(uint32_t *)0x1FFFF7EC;
-  Device_Serial2 = *(uint32_t *)0x1FFFF7F0;
-
-  if (Device_Serial0 != 0) {
-    _IntToUnicode(Device_Serial0, &USBD_StringSerial[2], 8);
-    _IntToUnicode(Device_Serial1, &USBD_StringSerial[18], 8);
-    _IntToUnicode(Device_Serial2, &USBD_StringSerial[34], 8);
-  }
 }
 
 xdata void USBD_DeviceDescriptorUpdate()
