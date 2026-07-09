@@ -10,22 +10,15 @@
 #include "usb_lib.h"
 #include "usb_prop.h"
 
-#include "hidconfig.h"
-
 #define OUT_EP ENDP1
 
 uint8_t HID_Buffer_OUT[64] = {0x00};
 uint8_t HID_Buffer_IN[64]  = {0x00};
 
-uint8_t HID_SGIO4_Buffer_IN[64]    = {0x00};
-uint8_t HID_KeyBoard_Buffer_IN[18] = {0x00};
-uint8_t HID_SPMouse_Buffer_IN[5]   = {0x22, 0x00, 0x00, 0x00, 0x40};
+uint8_t HID_SGIO4_Buffer_IN[64] = {0x00};
 
 static DataReceive *dataReceive = (DataReceive *)HID_Buffer_OUT;
 static DataUpload *dataUpload   = (DataUpload *)HID_SGIO4_Buffer_IN;
-
-static KbdData *kbdData     = (KbdData *)HID_KeyBoard_Buffer_IN;
-static SpMseData *spMseData = (SpMseData *)HID_SPMouse_Buffer_IN;
 
 static uint16_t prevKeyStatus    = 0;
 static uint16_t activeKeyStatus  = 0;
@@ -34,11 +27,6 @@ static uint16_t changedKeyStatus = 0;
 static uint16_t prevRollerValue   = 0;
 static uint16_t activeRollerValue = 0;
 
-uint8_t intervalID = 0xFF;
-
-#define INTERVAL_HEARTBEAT_MS_IDLE   30
-#define INTERVAL_HEARTBEAT_MS_ACTIVE 6
-
 void HIDIO_Receive_Handler()
 {
   switch (dataReceive->reportID) {
@@ -46,9 +34,6 @@ void HIDIO_Receive_Handler()
       switch (dataReceive->command) {
         case SET_COMM_TIMEOUT: {
           dataUpload->systemStatus = 0x30;
-
-          clearInterval(intervalID);
-          intervalID = setInterval(HIDIO_SGIO4_Heartbeat, INTERVAL_HEARTBEAT_MS_ACTIVE);
           break;
         }
         case SET_SAMPLING_COUNT: {
@@ -93,78 +78,13 @@ uint8_t HIDIO_SGIO4_Upload()
   return USBD_ENDPx_DataUp(OUT_EP, HID_Buffer_IN, 64);
 }
 
-volatile static uint8_t kbdUploadState   = 0;
-volatile static uint8_t kbdUploadPending = 0;
-volatile static uint8_t spMseChanged     = 0;
-
-uint8_t HIDIO_KBD_Upload()
-{
-  uint8_t result;
-
-  if (kbdUploadState == 0) {
-    memset(HID_Buffer_IN, 0, 64);
-    memcpy(HID_Buffer_IN, HID_KeyBoard_Buffer_IN, 18);
-    result = USBD_ENDPx_DataUp(OUT_EP, HID_Buffer_IN, 18);
-    if (result == USB_SUCCESS) {
-      kbdUploadState = 1;
-    }
-  } else {
-    memset(HID_Buffer_IN, 0, 64);
-    memcpy(HID_Buffer_IN, HID_SPMouse_Buffer_IN, 5);
-    result = USBD_ENDPx_DataUp(OUT_EP, HID_Buffer_IN, 5);
-    if (result == USB_SUCCESS) {
-      kbdUploadState = 0;
-    }
-  }
-  return result;
-}
-
 void HIDIO_Upload()
 {
   static uint8_t timeoutID = 0xFF;
-  uint8_t usbResult        = 0xFF;
-  switch (GlobalData->DeviceMode) {
-    case 1:
-      resetInterval(intervalID);
-      usbResult = HIDIO_SGIO4_Upload();
-      break;
-    case 2:
-      SP_INPUT_OnDataUpdate_Handler();
-      usbResult = USB_SUCCESS;
-      break;
-    case 3:
-      if (kbdUploadPending) {
-        usbResult = HIDIO_KBD_Upload();
-        if (usbResult == USB_SUCCESS && kbdUploadState == 0) {
-          kbdUploadPending = 0;
-          spMseChanged     = 0;
-        }
-        break;
-      }
-      kbdUploadState = 0;
-      usbResult      = HIDIO_KBD_Upload();
-      if (usbResult == USB_SUCCESS) {
-        if (spMseChanged) {
-          kbdUploadPending = 1;
-          usbResult        = 0xFE;
-        } else {
-          kbdUploadState = 0;
-        }
-      }
-      break;
-    default:
-      break;
-  }
+  uint8_t usbResult = HIDIO_SGIO4_Upload();
   if (usbResult != USB_SUCCESS) {
     clearTimeout(timeoutID);
     timeoutID = setTimeout(HIDIO_Upload, 1);
-  }
-}
-
-void HIDIO_SGIO4_Heartbeat()
-{
-  if (GlobalData->DeviceMode == 1) {
-    HIDIO_SGIO4_Upload();
   }
 }
 
@@ -192,30 +112,6 @@ void HIDIO_SGIO4_FreshData()
   }
 }
 
-void HIDIO_KBD_FreshData()
-{
-  static uint16_t prevSpMseX = 0;
-
-  spMseData->x = (uint16_t)(~activeRollerValue) >> 1;
-
-  if (spMseData->x != prevSpMseX) {
-    spMseChanged = 1;
-  } else {
-    spMseChanged = 0;
-  }
-  prevSpMseX = spMseData->x;
-
-  memset(kbdData, 0x00, sizeof(KbdData));
-  kbdData->reportID = 0x31;
-
-  for (uint8_t i = 0; i < KEY_COUNT; i++) {
-    if (KeyScan_GetKeyDebouncedStatus(i)) {
-      kbdData->ctrlkey |= kbd_key_map[i][0];
-      kbdData->keymap[i] = kbd_key_map[i][1];
-    }
-  }
-}
-
 void HIDIO_Update()
 {
   uint8_t freshRequired = 0;
@@ -235,19 +131,7 @@ void HIDIO_Update()
   prevRollerValue = activeRollerValue;
 
   if (freshRequired) {
-    freshRequired = 0;
-    switch (GlobalData->DeviceMode) {
-      case 1:
-        HIDIO_SGIO4_FreshData();
-        break;
-      case 2:
-        break;
-      case 3:
-        HIDIO_KBD_FreshData();
-        break;
-      default:
-        break;
-    }
+    HIDIO_SGIO4_FreshData();
     HIDIO_Upload();
   }
 }
@@ -262,7 +146,4 @@ xdata void HIDIO_Init()
   dataUpload->systemStatus = 0x30;
 
   HIDIO_SGIO4_FreshData();
-
-  clearInterval(intervalID);
-  intervalID = setInterval(HIDIO_SGIO4_Heartbeat, INTERVAL_HEARTBEAT_MS_IDLE);
 }

@@ -44,25 +44,6 @@ typedef struct {
   uint8_t payload[62];
 } __packed DataReceive;
 
-typedef struct {
-  uint8_t reportID;
-  uint8_t ctrlkey;
-  uint8_t keymap[16];
-} __packed KbdData;
-
-typedef struct {
-  uint8_t reportID;
-  uint8_t button;
-  uint8_t x;
-  uint8_t y;
-  uint8_t wheel;
-} __packed MseData;
-typedef struct {
-  uint8_t reportID;
-  uint16_t x;
-  uint16_t y;
-} __packed SpMseData;
-
 const static uint8_t hid_key_map[KEY_COUNT][2] = {
     {0x00, 0x01}, // BTA
     {0x00, 0x02}, // BTB
@@ -76,19 +57,6 @@ const static uint8_t hid_key_map[KEY_COUNT][2] = {
     {0x01, 0x01}, // SRV
 };
 
-const static uint8_t kbd_key_map[KEY_COUNT][2] = {
-    {0x00, 0x16}, // BTA
-    {0x00, 0x07}, // BTB
-    {0x00, 0x09}, // BTC
-    {0x00, 0x0D}, // BTD
-    {0x00, 0x0E}, // FXL
-    {0x00, 0x0F}, // FXR
-    {0x00, 0x2C}, // START
-    {0x00, 0x3C}, // COIN
-    {0x00, 0x3A}, // TEST
-    {0x00, 0x3B}, // SRV
-};
-void HIDIO_SGIO4_Heartbeat();
 void HIDIO_Init();
 void HIDIO_Receive_Handler();
 void HIDIO_Update();
