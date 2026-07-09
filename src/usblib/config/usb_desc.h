@@ -44,12 +44,12 @@ extern "C" {
 #define USBD_SIZE_STRING_LANGID           16
 #define USBD_SIZE_STRING_VENDOR           22
 #define USBD_SIZE_STRING_PRODUCT          38
-#define USBD_SIZE_STRING_SERIAL           28
+#define USBD_SIZE_STRING_SERIAL           50
 #define USBD_SIZE_STRING_CONFIG           22
 #define USBD_SIZE_STRING_HIDIO            28
 #define USBD_SIZE_STRING_CUSTOM_HID       30
 
-#define USBD_SIZE_STRING_PRODUCT_zh_hans  30
+#define USBD_SIZE_STRING_PRODUCT_zh_hans  24
 #define USBD_SIZE_STRING_CUSTOM_HID_zh_hans 30
 
 extern uint8_t USBD_DeviceDescriptor[USBD_SIZE_DEVICE_DESC];

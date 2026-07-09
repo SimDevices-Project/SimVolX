@@ -201,13 +201,15 @@ xdata_rodata const uint8_t USBD_StringProduct[USBD_SIZE_STRING_PRODUCT] = {
 xdata_rodata const uint8_t USBD_StringProduct_zh_hans[USBD_SIZE_STRING_PRODUCT_zh_hans] = {
     USBD_SIZE_STRING_PRODUCT_zh_hans,
     USB_STRING_DESCRIPTOR_TYPE,
-    0x53, 0x00, 0x69, 0x00, 0x6d, 0x00, 0x47, 0x00, 0x45, 0x00, 0x4b, 0x00, 0x49, 0x00, 0x57, 0x88, 0x3a, 0x67, 0xce, 0x98, 0x3c, 0x68, 0xa7, 0x63, 0x36, 0x52, 0x68, 0x56};
+    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0,
+    0xA7, 0x63, 0x36, 0x52, 0x68, 0x56};
 
 uint8_t USBD_StringSerial[USBD_SIZE_STRING_SERIAL] = {
     USBD_SIZE_STRING_SERIAL,
     USB_STRING_DESCRIPTOR_TYPE,
-    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0,
-    0x38, 0x6E, 0x0F, 0x62, 0xA7, 0x63, 0x36, 0x52, 0x68, 0x56};
+    '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0,
+    '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0,
+};
 
 xdata_rodata const uint8_t USBD_StringConfig[USBD_SIZE_STRING_CONFIG] = {
     USBD_SIZE_STRING_CONFIG,
@@ -438,6 +440,16 @@ xdata void _IntToUnicode(uint32_t value, uint8_t *pbuf, uint8_t len)
 
 xdata void USBD_SerialNumUpdate()
 {
+  uint32_t Device_Serial0, Device_Serial1, Device_Serial2;
+  Device_Serial0 = *(uint32_t *)0x1FFFF7E8;
+  Device_Serial1 = *(uint32_t *)0x1FFFF7EC;
+  Device_Serial2 = *(uint32_t *)0x1FFFF7F0;
+
+  if (Device_Serial0 != 0) {
+    _IntToUnicode(Device_Serial0, &USBD_StringSerial[2], 8);
+    _IntToUnicode(Device_Serial1, &USBD_StringSerial[18], 8);
+    _IntToUnicode(Device_Serial2, &USBD_StringSerial[34], 8);
+  }
 }
 
 xdata void USBD_DeviceDescriptorUpdate()
