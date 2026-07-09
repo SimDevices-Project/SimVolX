@@ -1,0 +1,546 @@
+name: Auto-Build-Firmware
+run-name: Building Firmware...
+on:
+  push:
+    branches: [ main, master ]  # Only active on main branch for nightly builds
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual triggering
+jobs:
+  build-firmware:
+    name: Build Multi-Target Firmware
+    runs-on: windows-2022
+    permissions:
+      contents: write
+      actions: read
+    strategy:
+      matrix:
+        target: [SimGETRO_Public, SimGETRO_EarlyHardware]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Clean build artifacts
+        run: |
+          make clean_all
+      
+      - name: Build firmware for ${{ matrix.target }}
+        run: |
+          make TARGET=${{ matrix.target }} all -j4
+      
+      - name: Create output directory and copy firmware files
+        run: |
+          mkdir "output-${{ matrix.target }}"
+          Copy-Item "./build/${{ matrix.target }}/SimGEKI.bin" -Destination "./output-${{ matrix.target }}/SimGEKI-${{ matrix.target }}.bin" -Force
+          Copy-Item "./build/${{ matrix.target }}/SimGEKI.hex" -Destination "./output-${{ matrix.target }}/SimGEKI-${{ matrix.target }}.hex" -Force
+        shell: pwsh
+      
+      - name: Upload firmware to artifacts (bin)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SimGEKI-${{ matrix.target }}_firmware_bin
+          path: ./output-${{ matrix.target }}/SimGEKI-${{ matrix.target }}.bin
+          retention-days: 90
+      
+      - name: Upload firmware to artifacts (hex)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SimGEKI-${{ matrix.target }}_firmware_hex
+          path: ./output-${{ matrix.target }}/SimGEKI-${{ matrix.target }}.hex
+          retention-days: 90
+      
+      - name: Upload files to release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'nightly-builds')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            ./output-${{ matrix.target }}/SimGEKI-${{ matrix.target }}.bin
+            ./output-${{ matrix.target }}/SimGEKI-${{ matrix.target }}.hex
+
+  # Upload release builds to gh-pages standard folder
+  upload-release-to-gh-pages:
+    name: Upload Release to gh-pages
+    runs-on: windows-2022
+    permissions:
+      contents: write
+      actions: read
+    needs: build-firmware
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'nightly-builds')
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./release-artifacts
+      
+      - name: Setup gh-pages branch
+        run: |
+          # Configure git user
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Checkout existing gh-pages branch
+          Write-Host "Checking out gh-pages branch..."
+          git fetch origin gh-pages
+          git checkout gh-pages
+        shell: pwsh
+      
+      - name: Prepare standard release files
+        run: |
+          # Create standard directory if it doesn't exist
+          if (-not (Test-Path "./standard")) {
+            New-Item -ItemType Directory -Path "./standard" -Force
+          }
+          
+          # Copy all firmware files to standard directory with detailed logging
+          Write-Host "Copying firmware files to standard directory..."
+          $releaseFiles = Get-ChildItem -Path "./release-artifacts" -Recurse -Include "*.bin", "*.hex"
+          
+          if ($releaseFiles.Count -eq 0) {
+            Write-Host "No firmware files found in release-artifacts directory!"
+            Get-ChildItem -Path "./release-artifacts" -Recurse | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+            exit 1
+          }
+          
+          $releaseFiles | ForEach-Object {
+            $destPath = "./standard/$($_.Name)"
+            Write-Host "Copying $($_.FullName) to $destPath"
+            Copy-Item $_.FullName -Destination $destPath -Force
+            if (Test-Path $destPath) {
+              Write-Host "✓ Successfully copied $($_.Name)"
+            } else {
+              Write-Host "✗ Failed to copy $($_.Name)"
+            }
+          }
+          
+          # Verify files were copied
+          Write-Host "Verifying files in standard directory:"
+          $copiedFiles = Get-ChildItem -Path "./standard" -Recurse -Include "*.bin", "*.hex"
+          $copiedFiles | ForEach-Object { Write-Host "  ✓ $($_.Name)" }
+          
+          # Create index file for easy browsing
+          $date = Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC'
+          $indexContent = "# SimGEKI Standard Release Firmware Files`n`n"
+          $indexContent += "Last updated: $date`n"
+          $indexContent += "Release tag: ${{ github.ref_name }}`n`n"
+          $indexContent += "## Available Files:`n`n"
+          
+          $copiedFiles | ForEach-Object {
+            $indexContent += "- [$($_.Name)](./$($_.Name))`n"
+          }
+          
+          $indexContent += "`n## Direct Access URLs:`n`n"
+          $indexContent += "Base URL: ``https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/standard/```n`n"
+          
+          $copiedFiles | ForEach-Object {
+            $indexContent += "- [$($_.Name)](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/standard/$($_.Name))`n"
+          }
+          
+          $indexContent | Out-File -FilePath "./standard/README.md" -Encoding UTF8
+          
+          # Clean up ALL files except firmware files and READMEs
+          Write-Host "Cleaning up all non-firmware files from gh-pages..."
+          Get-ChildItem -Path "." -Recurse | Where-Object { 
+            -not $_.PSIsContainer -and
+            $_.Name -notmatch "\.(bin|hex|md)$"
+          } | Remove-Item -Force -ErrorAction SilentlyContinue
+          
+          # Also remove empty directories except standard and nightly
+          Get-ChildItem -Path "." -Recurse -Directory | Where-Object {
+            $_.Name -ne "standard" -and 
+            $_.Name -ne "nightly" -and
+            (Get-ChildItem $_.FullName -Force | Measure-Object).Count -eq 0
+          } | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        shell: pwsh
+      
+      - name: Generate latest.json manifest
+        run: |
+          $nightlyData = $null
+          try {
+            $nightlyPub = gh api repos/$env:GITHUB_REPOSITORY/releases/tags/nightly --jq '.published_at' 2>$null
+            if ($nightlyPub) {
+              $nightlyData = [ordered]@{
+                build_time = $nightlyPub
+                commit = $null
+              }
+              try {
+                $nightlyBody = gh api repos/$env:GITHUB_REPOSITORY/releases/tags/nightly --jq '.body' 2>$null
+                if ($nightlyBody -match 'Source Commit:.*?`([0-9a-f]{40})`') {
+                  $nightlyData.commit = $matches[1]
+                }
+              } catch {}
+            }
+          } catch {
+            Write-Host "No nightly release found, nightly will be null"
+          }
+          
+          $manifest = [ordered]@{
+            stable = [ordered]@{
+              tag_name = "${{ github.ref_name }}"
+              published_at = "${{ github.event.release.published_at }}"
+            }
+            nightly = $nightlyData
+          }
+          
+          $manifest | ConvertTo-Json -Depth 3 | Out-File -FilePath "./latest.json" -Encoding UTF8
+          Write-Host "Generated latest.json:"
+          Get-Content "./latest.json"
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Commit and push to gh-pages
+        run: |
+          git add standard/ latest.json
+          
+          # Check if there are changes to commit
+          $changes = git diff --staged --name-only
+          if ($changes) {
+            git commit -m "📦 Update standard release files - ${{ github.ref_name }}
+            
+            Release: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+            
+            git push origin gh-pages
+            Write-Host "Successfully pushed standard release files to gh-pages"
+          } else {
+            Write-Host "No changes to commit for standard release"
+          }
+        shell: pwsh
+
+  # Nightly builds job - collect all artifacts and update nightly branch
+  update-nightly-builds:
+    name: Update Nightly Branch
+    runs-on: windows-2022
+    permissions:
+      contents: write
+      actions: read
+    needs: build-firmware
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./nightly-artifacts
+      
+      - name: Prepare nightly release files
+        run: |
+          mkdir "nightly-release"
+          # Copy all 'bin' & 'hex' files into 'nightly-release' directory
+          Get-ChildItem -Path "./nightly-artifacts" -Recurse -Include "*.bin", "*.hex" | ForEach-Object {
+            Copy-Item $_.FullName -Destination "./nightly-release/" -Force
+          }
+          # Show file list for debugging
+          Write-Host "Files prepared for nightly release:"
+          Get-ChildItem -Path "./nightly-release/"
+        shell: pwsh
+      
+      - name: Create/Update nightly branch and commit files
+        run: |
+          # Configure git user
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Clean up any existing nightly references to avoid conflicts
+          Write-Host "Cleaning up existing nightly references..."
+          try { git branch -D nightly } catch { Write-Host "Local nightly branch not found" }
+          try { git tag -d nightly } catch { Write-Host "Local nightly tag not found" }
+          try { git push origin --delete nightly } catch { Write-Host "Remote nightly branch/tag not found" }
+          
+          # Create or switch to nightly branch from current commit
+          Write-Host "Creating fresh nightly branch..."
+          git checkout -b nightly
+          
+          # Copy firmware files to the root for easy access
+          Write-Host "Copying firmware files to nightly branch..."
+          Copy-Item "./nightly-release/*" -Destination "./" -Force
+          
+          # Add firmware files to git
+          git add *.bin *.hex
+          
+          # Check if there are changes to commit
+          $changes = git diff --staged --name-only
+          if ($changes) {
+            Write-Host "Committing firmware files..."
+            git commit -m "🌙 Nightly Build - Auto-updated
+            
+            📅 Build Date: ${{ github.event.head_commit.timestamp }}
+            🔨 Commit: ${{ github.sha }}
+            👤 Author: ${{ github.event.head_commit.author.name }}
+            💬 Message: ${{ github.event.head_commit.message }}
+
+            Available firmware variants:
+            - SimGEKI-SimGETRO_Public.bin/hex - Public release version  
+            - SimGEKI-SimGETRO_EarlyHardware.bin/hex - Early hardware version"
+            
+            # Push the nightly branch explicitly specifying it's a branch
+            Write-Host "Pushing nightly branch to remote..."
+            git push origin refs/heads/nightly:refs/heads/nightly --force
+          } else {
+            Write-Host "No changes to commit"
+          }
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Delete existing nightly release and tag
+        continue-on-error: true
+        run: |
+          # 使用 GitHub CLI 删除现有的 nightly release（如果存在）
+          Write-Host "Attempting to delete existing nightly release..."
+          try { 
+            gh release delete nightly --yes 
+            Write-Host "Existing nightly release deleted"
+          } catch { 
+            Write-Host "No existing nightly release found or already deleted"
+          }
+          
+          # 删除远程 nightly tag（如果存在）
+          Write-Host "Attempting to delete remote nightly tag..."
+          try { 
+            git push origin --delete refs/tags/nightly 
+            Write-Host "Remote nightly tag deleted"
+          } catch { 
+            Write-Host "Remote nightly tag not found"
+          }
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create new nightly release with updated info
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: nightly
+          target_commitish: nightly
+          name: "SimGEKI Firmware Nightly Builds (Updated ${{ github.event.head_commit.timestamp }})"
+          body: |
+            # 🌙 SimGEKI Nightly Builds - Auto Updated!
+
+            ## ℹ️ What is this?
+
+            Nightly Builds are the latest development versions of the SimGEKI firmware, automatically built with every commit to the main branch. This means you always have access to the most recent changes and features, but please note that these builds are not guaranteed to be stable.
+
+            ## 🚀 How to use?
+
+            Download the firmware files from the assets below and flash them to your SimGEKI device. Make sure to check the compatibility with your hardware version. 
+            
+            📖 **Flash Instructions**: [Update Firmware Guide](https://sim.bysb.net/#/simgeki2/configs/update-firmware/)
+
+            ## 📋 Latest Build Information
+
+            📅 **Build Time**: ${{ github.event.head_commit.timestamp }}  
+            🔨 **Source Commit**: [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+            👤 **Author**: ${{ github.event.head_commit.author.name }}  
+            💬 **Commit Message**: 
+            ```
+            ${{ github.event.head_commit.message }}
+            ```
+
+            ## 📦 Available Firmware Variants
+
+            | Variant | Description | Download |
+            |---------|-------------|----------|
+            | **SimGETRO_Public** | Public release version | [📥 BIN](https://github.com/${{ github.repository }}/releases/download/nightly/SimGEKI-SimGETRO_Public.bin) / [📥 HEX](https://github.com/${{ github.repository }}/releases/download/nightly/SimGEKI-SimGETRO_Public.hex) |
+            | **SimGETRO_EarlyHardware** | Early hardware version | [📥 BIN](https://github.com/${{ github.repository }}/releases/download/nightly/SimGEKI-SimGETRO_EarlyHardware.bin) / [📥 HEX](https://github.com/${{ github.repository }}/releases/download/nightly/SimGEKI-SimGETRO_EarlyHardware.hex) |
+
+            ## ⚠️ Important Notes
+
+            - 🔄 **Auto-Updated**: This release is automatically updated with every commit to the main branch
+            - 🧪 **Development Build**: These builds may be unstable and are intended for testing
+            - 📅 **Last Updated**: ${{ github.event.head_commit.timestamp }}
+            - 🌐 **Repository**: [SimDevices-Project/SimGEKI](https://github.com/${{ github.repository }})
+
+            ---
+            
+            💡 **Tip**: For stable releases, check the [official releases](https://github.com/${{ github.repository }}/releases) page.
+          prerelease: true
+          files: |
+            ./nightly-release/*
+      
+      - name: Upload nightly builds to gh-pages
+        run: |
+          # Configure git user first
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Check if gh-pages branch exists remotely
+          Write-Host "Checking out gh-pages branch for nightly upload..."
+          git fetch origin gh-pages
+          git checkout gh-pages
+          
+          Write-Host "Current working directory after checkout: $(Get-Location)"
+        shell: pwsh
+      
+      - name: Download artifacts for gh-pages upload
+        uses: actions/download-artifact@v4
+        with:
+          path: ./nightly-artifacts-ghpages
+      
+      - name: Prepare and upload nightly files to gh-pages
+        run: |
+          # Prepare nightly files from artifacts
+          Write-Host "Preparing nightly files from artifacts..."
+          if (-not (Test-Path "./nightly-release-ghpages")) {
+            New-Item -ItemType Directory -Path "./nightly-release-ghpages" -Force
+          }
+          
+          # Copy all 'bin' & 'hex' files from artifacts
+          $artifactFiles = Get-ChildItem -Path "./nightly-artifacts-ghpages" -Recurse -Include "*.bin", "*.hex"
+          Write-Host "Artifact files found:"
+          $artifactFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+          
+          if ($artifactFiles.Count -eq 0) {
+            Write-Host "No firmware files found in artifacts!"
+            Get-ChildItem -Path "./nightly-artifacts-ghpages" -Recurse | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+            exit 1
+          }
+          
+          $artifactFiles | ForEach-Object {
+            Copy-Item $_.FullName -Destination "./nightly-release-ghpages/" -Force
+            Write-Host "Copied $($_.Name) to nightly-release-ghpages/"
+          }
+          
+          # Create nightly directory if it doesn't exist
+          Write-Host "Creating nightly directory..."
+          if (-not (Test-Path "./nightly")) {
+            New-Item -ItemType Directory -Path "./nightly" -Force
+            Write-Host "Created nightly directory"
+          } else {
+            Write-Host "Nightly directory already exists"
+          }
+          
+          # Copy all firmware files to nightly directory with detailed logging
+          Write-Host "Copying firmware files to nightly directory..."
+          $nightlyFiles = Get-ChildItem -Path "./nightly-release-ghpages" -Recurse -Include "*.bin", "*.hex"
+          $nightlyFiles | ForEach-Object {
+            $destPath = "./nightly/$($_.Name)"
+            Write-Host "Copying $($_.FullName) to $destPath"
+            Copy-Item $_.FullName -Destination $destPath -Force
+            if (Test-Path $destPath) {
+              Write-Host "✓ Successfully copied $($_.Name)"
+            } else {
+              Write-Host "✗ Failed to copy $($_.Name)"
+            }
+          }
+          
+          # Verify files were copied
+          Write-Host "Verifying files in nightly directory:"
+          $copiedFiles = Get-ChildItem -Path "./nightly" -Recurse -Include "*.bin", "*.hex"
+          if ($copiedFiles.Count -eq 0) {
+            Write-Host "ERROR: No files found in nightly directory after copy!"
+            Write-Host "Directory contents:"
+            Get-ChildItem -Path "./nightly" | ForEach-Object { Write-Host "  - $($_.Name)" }
+            exit 1
+          } else {
+            $copiedFiles | ForEach-Object { Write-Host "  ✓ $($_.Name)" }
+          }
+          
+          # Create index file for easy browsing
+          Write-Host "Creating README.md for nightly directory..."
+          $date = Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC'
+          $indexContent = "# SimGEKI Nightly Build Firmware Files`n`n"
+          $indexContent += "Last updated: $date`n"
+          $indexContent += "Build commit: ${{ github.sha }}`n"
+          $indexContent += "Build author: ${{ github.event.head_commit.author.name }}`n`n"
+          $indexContent += "## Available Files:`n`n"
+          
+          $copiedFiles | ForEach-Object {
+            $indexContent += "- [$($_.Name)](./$($_.Name))`n"
+          }
+          
+          $indexContent += "`n## Direct Access URLs:`n`n"
+          $indexContent += "Base URL: ``https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/nightly/```n`n"
+          
+          $copiedFiles | ForEach-Object {
+            $indexContent += "- [$($_.Name)](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/nightly/$($_.Name))`n"
+          }
+          
+          $indexContent | Out-File -FilePath "./nightly/README.md" -Encoding UTF8
+          Write-Host "Created README.md in nightly directory"
+          
+          # Clean up ALL files except firmware files and READMEs
+          Write-Host "Cleaning up all non-firmware files from gh-pages..."
+          Get-ChildItem -Path "." -Recurse | Where-Object { 
+            -not $_.PSIsContainer -and
+            $_.Name -notmatch "\.(bin|hex|md)$"
+          } | Remove-Item -Force -ErrorAction SilentlyContinue
+          
+          # Also remove empty directories except standard and nightly
+          Get-ChildItem -Path "." -Recurse -Directory | Where-Object {
+            $_.Name -ne "standard" -and 
+            $_.Name -ne "nightly" -and
+            (Get-ChildItem $_.FullName -Force | Measure-Object).Count -eq 0
+          } | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+          
+          # Generate latest.json manifest
+          $stableData = $null
+          try {
+            $stableJson = gh api repos/$env:GITHUB_REPOSITORY/releases/latest --jq '{tag_name: .tag_name, published_at: .published_at}' 2>$null
+            if ($stableJson) {
+              $stableData = $stableJson | ConvertFrom-Json
+            }
+          } catch {
+            Write-Host "No stable release found, stable will be null"
+          }
+          
+          $nightlyPub = gh api repos/$env:GITHUB_REPOSITORY/releases/tags/nightly --jq '.published_at' 2>$null
+          $nightlyData = [ordered]@{
+            build_time = $nightlyPub
+            commit = "${{ github.sha }}"
+          }
+          
+          $manifest = [ordered]@{
+            stable = $stableData
+            nightly = $nightlyData
+          }
+          
+          $manifest | ConvertTo-Json -Depth 3 | Out-File -FilePath "./latest.json" -Encoding UTF8
+          Write-Host "Generated latest.json:"
+          Get-Content "./latest.json"
+          
+          # Add and commit changes
+          Write-Host "Adding files to git..."
+          git add nightly/ latest.json
+          
+          $changes = git diff --staged --name-only
+          if ($changes) {
+            Write-Host "Files to be committed:"
+            $changes | ForEach-Object { Write-Host "  - $_" }
+            
+            git commit -m "🌙 Update nightly firmware files
+            
+            Build Date: $date
+            Commit: ${{ github.sha }}
+            Author: ${{ github.event.head_commit.author.name }}
+            
+            Files updated:
+            $(($copiedFiles | ForEach-Object { "- $($_.Name)" }) -join "`n")"
+            
+            Write-Host "Pushing to gh-pages..."
+            git push origin gh-pages
+            Write-Host "✓ Successfully pushed nightly files to gh-pages"
+          } else {
+            Write-Host "No changes to commit for nightly files"
+          }
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

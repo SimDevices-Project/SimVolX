@@ -1,0 +1,70 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "files.autoGuessEncoding": true,
+        "C_Cpp.default.configurationProvider": "cl.eide",
+        "files.associations": {
+            ".eideignore": "ignore",
+            "*.h": "c",
+            "*.c": "c",
+            "*.hxx": "cpp",
+            "*.hpp": "cpp",
+            "*.c++": "cpp",
+            "*.cpp": "cpp",
+            "*.cxx": "cpp",
+            "*.cc": "cpp",
+            "*.a51": "a51",
+            "array": "c",
+            "deque": "c",
+            "forward_list": "c",
+            "list": "c",
+            "string": "c",
+            "unordered_map": "c",
+            "unordered_set": "c",
+            "vector": "c",
+            "string_view": "c",
+            "rope": "c",
+            "slist": "c",
+            "initializer_list": "c",
+            "regex": "c",
+            "valarray": "c",
+            "bitset": "c",
+            "chrono": "c"
+        },
+        "[yaml]": {
+            "editor.insertSpaces": true,
+            "editor.tabSize": 4,
+            "editor.autoIndent": "advanced"
+        },
+        "C_Cpp.errorSquiggles": "disabled",
+        "EIDE.SerialPortMonitor.BaudRate": 115200,
+        "EIDE.RISCV.InstallDirectory": "${workspaceFolder}/tools/wch_riscv_gcc",
+        "EIDE.RISCV.ToolPrefix": "riscv-wch-elf-",
+        "EIDE.OpenOCD.ExePath": ".\\tools\\wch_openocd\\bin\\openocd.exe"
+    },
+    "extensions": {
+        "recommendations": [
+            "cl.eide",
+            "keroc.hex-fmt",
+            "xiaoyongdong.srecord",
+            "hars.cppsnippets",
+            "zixuanwang.linkerscript",
+            "redhat.vscode-yaml",
+            "IBM.output-colorizer",
+            "cschlosser.doxdocgen",
+            "ms-vscode.vscode-serial-monitor"
+        ]
+    },
+    "launch": {
+        "configurations": [],
+        "compounds": []
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": []
+    }
+}
