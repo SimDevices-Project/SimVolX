@@ -52,6 +52,9 @@ extern "C" {
 #define USBD_SIZE_STRING_PRODUCT_zh_hans    24
 #define USBD_SIZE_STRING_CUSTOM_HID_zh_hans 22
 
+#define USBD_SIZE_STRING_PRODUCT_zh_hant    24
+#define USBD_SIZE_STRING_CUSTOM_HID_zh_hant 22
+
 #define USBD_SIZE_STRING_BTN_A            10
 #define USBD_SIZE_STRING_BTN_B            10
 #define USBD_SIZE_STRING_BTN_C            10
@@ -61,10 +64,13 @@ extern "C" {
 #define USBD_SIZE_STRING_BTN_START        12
 #define USBD_SIZE_STRING_BTN_TEST         10
 #define USBD_SIZE_STRING_BTN_TEST_zh_hans  6
+#define USBD_SIZE_STRING_BTN_TEST_zh_hant   6
 #define USBD_SIZE_STRING_BTN_SERVICE      16
 #define USBD_SIZE_STRING_BTN_SERVICE_zh_hans 6
+#define USBD_SIZE_STRING_BTN_SERVICE_zh_hant 6
 #define USBD_SIZE_STRING_BTN_COIN         10
 #define USBD_SIZE_STRING_BTN_COIN_zh_hans  6
+#define USBD_SIZE_STRING_BTN_COIN_zh_hant   6
 #define USBD_SIZE_STRING_VOL_LEFT         12
 #define USBD_SIZE_STRING_VOL_RIGHT        12
 
@@ -82,6 +88,7 @@ extern uint8_t USBD_StringSerial[USBD_SIZE_STRING_SERIAL];
 
 extern const uint8_t USBD_StringProduct[USBD_SIZE_STRING_PRODUCT];
 extern const uint8_t USBD_StringProduct_zh_hans[USBD_SIZE_STRING_PRODUCT_zh_hans];
+extern const uint8_t USBD_StringProduct_zh_hant[USBD_SIZE_STRING_PRODUCT_zh_hant];
 
 extern const uint8_t USBD_StringConfig[USBD_SIZE_STRING_CONFIG];
 
@@ -89,6 +96,7 @@ extern const uint8_t USBD_StringHIDIO[USBD_SIZE_STRING_HIDIO];
 
 extern const uint8_t USBD_StringCustomHID[USBD_SIZE_STRING_CUSTOM_HID];
 extern const uint8_t USBD_StringCustomHID_zh_hans[USBD_SIZE_STRING_CUSTOM_HID_zh_hans];
+extern const uint8_t USBD_StringCustomHID_zh_hant[USBD_SIZE_STRING_CUSTOM_HID_zh_hant];
 
 extern const uint8_t USBD_StringBtnA[USBD_SIZE_STRING_BTN_A];
 extern const uint8_t USBD_StringBtnB[USBD_SIZE_STRING_BTN_B];
@@ -99,10 +107,13 @@ extern const uint8_t USBD_StringBtnFXR[USBD_SIZE_STRING_BTN_FXR];
 extern const uint8_t USBD_StringBtnStart[USBD_SIZE_STRING_BTN_START];
 extern const uint8_t USBD_StringBtnTest[USBD_SIZE_STRING_BTN_TEST];
 extern const uint8_t USBD_StringBtnTest_zh_hans[USBD_SIZE_STRING_BTN_TEST_zh_hans];
+extern const uint8_t USBD_StringBtnTest_zh_hant[USBD_SIZE_STRING_BTN_TEST_zh_hant];
 extern const uint8_t USBD_StringBtnService[USBD_SIZE_STRING_BTN_SERVICE];
 extern const uint8_t USBD_StringBtnService_zh_hans[USBD_SIZE_STRING_BTN_SERVICE_zh_hans];
+extern const uint8_t USBD_StringBtnService_zh_hant[USBD_SIZE_STRING_BTN_SERVICE_zh_hant];
 extern const uint8_t USBD_StringBtnCoin[USBD_SIZE_STRING_BTN_COIN];
 extern const uint8_t USBD_StringBtnCoin_zh_hans[USBD_SIZE_STRING_BTN_COIN_zh_hans];
+extern const uint8_t USBD_StringBtnCoin_zh_hant[USBD_SIZE_STRING_BTN_COIN_zh_hant];
 extern const uint8_t USBD_StringVolLeft[USBD_SIZE_STRING_VOL_LEFT];
 extern const uint8_t USBD_StringVolRight[USBD_SIZE_STRING_VOL_RIGHT];
 

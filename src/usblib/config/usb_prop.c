@@ -92,7 +92,7 @@ MUTI_LANG_DESCRIPTOR Muti_Lang_String_Descriptor[USBD_NUMOF_STRING_DESC] =
         {
             {(uint8_t *)USBD_StringProduct, USBD_SIZE_STRING_PRODUCT},
             {(uint8_t *)USBD_StringProduct_zh_hans, USBD_SIZE_STRING_PRODUCT_zh_hans},
-            {NULL, 0},
+            {(uint8_t *)USBD_StringProduct_zh_hant, USBD_SIZE_STRING_PRODUCT_zh_hant},
             {NULL, 0},
         },
         {
@@ -116,7 +116,7 @@ MUTI_LANG_DESCRIPTOR Muti_Lang_String_Descriptor[USBD_NUMOF_STRING_DESC] =
         {
             {(uint8_t *)USBD_StringCustomHID, USBD_SIZE_STRING_CUSTOM_HID},
             {(uint8_t *)USBD_StringCustomHID_zh_hans, USBD_SIZE_STRING_CUSTOM_HID_zh_hans},
-            {NULL, 0},
+            {(uint8_t *)USBD_StringCustomHID_zh_hant, USBD_SIZE_STRING_CUSTOM_HID_zh_hant},
             {NULL, 0},
         },
         {
@@ -164,19 +164,19 @@ MUTI_LANG_DESCRIPTOR Muti_Lang_String_Descriptor[USBD_NUMOF_STRING_DESC] =
         {
             {(uint8_t *)USBD_StringBtnTest, USBD_SIZE_STRING_BTN_TEST},
             {(uint8_t *)USBD_StringBtnTest_zh_hans, USBD_SIZE_STRING_BTN_TEST_zh_hans},
-            {NULL, 0},
+            {(uint8_t *)USBD_StringBtnTest_zh_hant, USBD_SIZE_STRING_BTN_TEST_zh_hant},
             {NULL, 0},
         },
         {
             {(uint8_t *)USBD_StringBtnService, USBD_SIZE_STRING_BTN_SERVICE},
             {(uint8_t *)USBD_StringBtnService_zh_hans, USBD_SIZE_STRING_BTN_SERVICE_zh_hans},
-            {NULL, 0},
+            {(uint8_t *)USBD_StringBtnService_zh_hant, USBD_SIZE_STRING_BTN_SERVICE_zh_hant},
             {NULL, 0},
         },
         {
             {(uint8_t *)USBD_StringBtnCoin, USBD_SIZE_STRING_BTN_COIN},
             {(uint8_t *)USBD_StringBtnCoin_zh_hans, USBD_SIZE_STRING_BTN_COIN_zh_hans},
-            {NULL, 0},
+            {(uint8_t *)USBD_StringBtnCoin_zh_hant, USBD_SIZE_STRING_BTN_COIN_zh_hant},
             {NULL, 0},
         },
         {

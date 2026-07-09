@@ -204,6 +204,12 @@ xdata_rodata const uint8_t USBD_StringProduct_zh_hans[USBD_SIZE_STRING_PRODUCT_z
     'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0,
     0xA7, 0x63, 0x36, 0x52, 0x68, 0x56};
 
+xdata_rodata const uint8_t USBD_StringProduct_zh_hant[USBD_SIZE_STRING_PRODUCT_zh_hant] = {
+    USBD_SIZE_STRING_PRODUCT_zh_hant,
+    USB_STRING_DESCRIPTOR_TYPE,
+    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0,
+    0xA7, 0x63, 0x36, 0x52, 0x68, 0x56};
+
 uint8_t USBD_StringSerial[USBD_SIZE_STRING_SERIAL] = {
     USBD_SIZE_STRING_SERIAL,
     USB_STRING_DESCRIPTOR_TYPE,
@@ -228,6 +234,12 @@ xdata_rodata const uint8_t USBD_StringCustomHID[USBD_SIZE_STRING_CUSTOM_HID] = {
 
 xdata_rodata const uint8_t USBD_StringCustomHID_zh_hans[USBD_SIZE_STRING_CUSTOM_HID_zh_hans] = {
     USBD_SIZE_STRING_CUSTOM_HID_zh_hans,
+    USB_STRING_DESCRIPTOR_TYPE,
+    'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0,
+    0x4D, 0x91, 0x6E, 0x7F};
+
+xdata_rodata const uint8_t USBD_StringCustomHID_zh_hant[USBD_SIZE_STRING_CUSTOM_HID_zh_hant] = {
+    USBD_SIZE_STRING_CUSTOM_HID_zh_hant,
     USB_STRING_DESCRIPTOR_TYPE,
     'S', 0, 'i', 0, 'm', 0, 'V', 0, 'o', 0, 'l', 0, 'X', 0, ' ', 0,
     0x4D, 0x91, 0x6E, 0x7F};
@@ -277,6 +289,11 @@ xdata_rodata const uint8_t USBD_StringBtnTest_zh_hans[USBD_SIZE_STRING_BTN_TEST_
     USB_STRING_DESCRIPTOR_TYPE,
     0x4B, 0x6D, 0xD5, 0x8B};
 
+xdata_rodata const uint8_t USBD_StringBtnTest_zh_hant[USBD_SIZE_STRING_BTN_TEST_zh_hant] = {
+    USBD_SIZE_STRING_BTN_TEST_zh_hant,
+    USB_STRING_DESCRIPTOR_TYPE,
+    0x2C, 0x6E, 0x66, 0x8A};
+
 xdata_rodata const uint8_t USBD_StringBtnService[USBD_SIZE_STRING_BTN_SERVICE] = {
     USBD_SIZE_STRING_BTN_SERVICE,
     USB_STRING_DESCRIPTOR_TYPE,
@@ -287,6 +304,11 @@ xdata_rodata const uint8_t USBD_StringBtnService_zh_hans[USBD_SIZE_STRING_BTN_SE
     USB_STRING_DESCRIPTOR_TYPE,
     0x0D, 0x67, 0xA1, 0x52};
 
+xdata_rodata const uint8_t USBD_StringBtnService_zh_hant[USBD_SIZE_STRING_BTN_SERVICE_zh_hant] = {
+    USBD_SIZE_STRING_BTN_SERVICE_zh_hant,
+    USB_STRING_DESCRIPTOR_TYPE,
+    0x0D, 0x67, 0xD9, 0x52};
+
 xdata_rodata const uint8_t USBD_StringBtnCoin[USBD_SIZE_STRING_BTN_COIN] = {
     USBD_SIZE_STRING_BTN_COIN,
     USB_STRING_DESCRIPTOR_TYPE,
@@ -296,6 +318,11 @@ xdata_rodata const uint8_t USBD_StringBtnCoin_zh_hans[USBD_SIZE_STRING_BTN_COIN_
     USBD_SIZE_STRING_BTN_COIN_zh_hans,
     USB_STRING_DESCRIPTOR_TYPE,
     0x95, 0x62, 0x01, 0x5E};
+
+xdata_rodata const uint8_t USBD_StringBtnCoin_zh_hant[USBD_SIZE_STRING_BTN_COIN_zh_hant] = {
+    USBD_SIZE_STRING_BTN_COIN_zh_hant,
+    USB_STRING_DESCRIPTOR_TYPE,
+    0x95, 0x62, 0x63, 0x5E};
 
 xdata_rodata const uint8_t USBD_StringVolLeft[USBD_SIZE_STRING_VOL_LEFT] = {
     USBD_SIZE_STRING_VOL_LEFT,
