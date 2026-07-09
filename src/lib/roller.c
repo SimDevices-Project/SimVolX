@@ -2,192 +2,32 @@
 #include "roller.h"
 #include "data.h"
 
-#include "led.h"
-
-/* Global define */
-
-// Actully 5 bytes, extra 1 byte for data safety
-#define DATA_LEN               6
 #define VALUE_OFFSET_MASK      0xFFFF
-
-#define ROLLER_MODE_TEST_LIMIT 8
+#define VALUE_DEFAULT          0x8000
 
 #define _offset                GlobalData->RollerOffset
-#define VALUE_DEFAULT          0x8000
 
 #define ADC_DISCARD_SAMPLES 8
 #define ADC_VALID_SAMPLES   64
 #define ADC_TOTAL_SAMPLES   (ADC_DISCARD_SAMPLES + ADC_VALID_SAMPLES)
 
-typedef enum {
-  ROLLER_MODE_TEST = 0,
-  ROLLER_MODE_SPI,
-  ROLLER_MODE_ADC,
-} RollerMode;
-
-RollerMode rollerMode       = ROLLER_MODE_TEST;
-uint8_t rollerModeTestCount = ROLLER_MODE_TEST_LIMIT;
-
-int16_t Calibrattion_Val = 0;
-
 uint16_t ADCValue[ADC_TOTAL_SAMPLES * 2] = {0};
-uint16_t ADCValue2 = 0;
 
-const uint8_t TxData[DATA_LEN] = {0x05, 0x00};
-struct rxdata_t {
-  uint8_t zero;
-  uint8_t angle_h;
-  uint8_t angle_l;
-  uint8_t status;
-  uint8_t crc;
-  uint8_t dummy;
-} __packed EncoderData;
+volatile uint16_t EncoderValue  = 0;
+volatile uint16_t EncoderValue2 = 0;
 
-volatile uint16_t EncoderValue = 0;
+#define DEBOUNCE_LENGTH  8
+#define DEBOUNCE_LIMIT_A 0x0100
+#define DEBOUNCE_LIMIT_B 0x0040
 
-const uint8_t tableCRC[256] =
-    {
-        0x00, 0x1D, 0x3A, 0x27, 0x74, 0x69, 0x4E, 0x53, 0xE8, 0xF5, 0xD2, 0xCF, 0x9C, 0x81, 0xA6, 0xBB,
-        0xCD, 0xD0, 0xF7, 0xEA, 0xB9, 0xA4, 0x83, 0x9E, 0x25, 0x38, 0x1F, 0x02, 0x51, 0x4C, 0x6B, 0x76,
-        0x87, 0x9A, 0xBD, 0xA0, 0xF3, 0xEE, 0xC9, 0xD4, 0x6F, 0x72, 0x55, 0x48, 0x1B, 0x06, 0x21, 0x3C,
-        0x4A, 0x57, 0x70, 0x6D, 0x3E, 0x23, 0x04, 0x19, 0xA2, 0xBF, 0x98, 0x85, 0xD6, 0xCB, 0xEC, 0xF1,
-        0x13, 0x0E, 0x29, 0x34, 0x67, 0x7A, 0x5D, 0x40, 0xFB, 0xE6, 0xC1, 0xDC, 0x8F, 0x92, 0xB5, 0xA8,
-        0xDE, 0xC3, 0xE4, 0xF9, 0xAA, 0xB7, 0x90, 0x8D, 0x36, 0x2B, 0x0C, 0x11, 0x42, 0x5F, 0x78, 0x65,
-        0x94, 0x89, 0xAE, 0xB3, 0xE0, 0xFD, 0xDA, 0xC7, 0x7C, 0x61, 0x46, 0x5B, 0x08, 0x15, 0x32, 0x2F,
-        0x59, 0x44, 0x63, 0x7E, 0x2D, 0x30, 0x17, 0x0A, 0xB1, 0xAC, 0x8B, 0x96, 0xC5, 0xD8, 0xFF, 0xE2,
-        0x26, 0x3B, 0x1C, 0x01, 0x52, 0x4F, 0x68, 0x75, 0xCE, 0xD3, 0xF4, 0xE9, 0xBA, 0xA7, 0x80, 0x9D,
-        0xEB, 0xF6, 0xD1, 0xCC, 0x9F, 0x82, 0xA5, 0xB8, 0x03, 0x1E, 0x39, 0x24, 0x77, 0x6A, 0x4D, 0x50,
-        0xA1, 0xBC, 0x9B, 0x86, 0xD5, 0xC8, 0xEF, 0xF2, 0x49, 0x54, 0x73, 0x6E, 0x3D, 0x20, 0x07, 0x1A,
-        0x6C, 0x71, 0x56, 0x4B, 0x18, 0x05, 0x22, 0x3F, 0x84, 0x99, 0xBE, 0xA3, 0xF0, 0xED, 0xCA, 0xD7,
-        0x35, 0x28, 0x0F, 0x12, 0x41, 0x5C, 0x7B, 0x66, 0xDD, 0xC0, 0xE7, 0xFA, 0xA9, 0xB4, 0x93, 0x8E,
-        0xF8, 0xE5, 0xC2, 0xDF, 0x8C, 0x91, 0xB6, 0xAB, 0x10, 0x0D, 0x2A, 0x37, 0x64, 0x79, 0x5E, 0x43,
-        0xB2, 0xAF, 0x88, 0x95, 0xC6, 0xDB, 0xFC, 0xE1, 0x5A, 0x47, 0x60, 0x7D, 0x2E, 0x33, 0x14, 0x09,
-        0x7F, 0x62, 0x45, 0x58, 0x0B, 0x16, 0x31, 0x2C, 0x97, 0x8A, 0xAD, 0xB0, 0xE3, 0xFE, 0xD9, 0xC4};
+typedef struct {
+  uint16_t outputValue;
+  uint16_t debounceBuffer[DEBOUNCE_LENGTH];
+  uint32_t debounceSumValue;
+  uint16_t debounceAvgValue;
+  uint8_t debounceIndex;
+} DebounceState;
 
-/************************************************************************************************************
- * Name    : calcCRC8
- * Func    : Table CRC is the pointer to the look-up table (LUT)
- * input   :
- * output  :
- * Author  :
- * history :
- *************************************************************************************************************/
-//*Table CRC is the pointer to the look-up table (LUT)
-uint8_t calcCRC8(uint8_t *message, uint8_t Bytelength, const uint8_t *TableCRC)
-{
-  uint8_t crc;
-  uint8_t index;
-
-  crc = 0xFF;
-  for (index = 0; index < Bytelength; index++) {
-    crc = TableCRC[crc ^ *(message + index)];
-  }
-  return (~crc);
-}
-
-/*********************************************************************
- * @fn      SPI_FullDuplex_Init
- *
- * @brief   Configuring the SPI for full-duplex communication.
- *
- * @return  none
- */
-void SPI_FullDuplex_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStructure = {0};
-  SPI_InitTypeDef SPI_InitStructure   = {0};
-
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-
-  // NSS
-  GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12;
-  GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-  // SCK
-  GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_13;
-  GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-  // MISO
-  GPIO_InitStructure.GPIO_Pin  = GPIO_Pin_14;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-  // MOSI
-  GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_15;
-  GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-  SPI_SSOutputCmd(SPI2, ENABLE);
-
-  SPI_InitStructure.SPI_Direction         = SPI_Direction_2Lines_FullDuplex;
-  SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;
-  SPI_InitStructure.SPI_DataSize          = SPI_DataSize_8b;
-  SPI_InitStructure.SPI_CPOL              = SPI_CPOL_Low;
-  SPI_InitStructure.SPI_CPHA              = SPI_CPHA_1Edge;
-  SPI_InitStructure.SPI_NSS               = SPI_NSS_Hard;
-  SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_32;
-  SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_MSB;
-  SPI_InitStructure.SPI_CRCPolynomial     = 7;
-  SPI_Init(SPI2, &SPI_InitStructure);
-
-  SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
-  SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Rx, ENABLE);
-
-  SPI_Cmd(SPI2, ENABLE);
-}
-
-/*********************************************************************
- * @fn      DMA_Tx_Init
- *
- * @brief   Initializes the DMAy Channelx configuration.
- *
- * @param   DMA_CHx - x can be 1 to 7.
- *          ppadr - Peripheral base address.
- *          memadr - Memory base address.
- *          bufsize - DMA channel buffer size.
- *
- * @return  none
- */
-void DMA_Tx_Init(DMA_Channel_TypeDef *DMA_CHx, u32 ppadr, u32 memadr, u16 bufsize)
-{
-  DMA_InitTypeDef DMA_InitStructure = {0};
-
-  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-
-  DMA_DeInit(DMA_CHx);
-
-  DMA_InitStructure.DMA_PeripheralBaseAddr = ppadr;
-  DMA_InitStructure.DMA_MemoryBaseAddr     = memadr;
-  DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralDST;
-  DMA_InitStructure.DMA_BufferSize         = bufsize;
-  DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
-  DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;
-  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-  DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
-  DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;
-  DMA_InitStructure.DMA_Priority           = DMA_Priority_Medium;
-  DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;
-  DMA_Init(DMA_CHx, &DMA_InitStructure);
-}
-
-/*********************************************************************
- * @fn      DMA_Tx_Init_ADC
- *
- * @brief   Initializes the DMAy Channelx configuration.
- *
- * @param   DMA_CHx - x can be 1 to 7.
- *          ppadr - Peripheral base address.
- *          memadr - Memory base address.
- *          bufsize - DMA channel buffer size.
- *
- * @return  none
- */
 void DMA_Tx_Init_ADC(DMA_Channel_TypeDef *DMA_CHx, u32 ppadr, u32 memadr, u16 bufsize)
 {
   DMA_InitTypeDef DMA_InitStructure = {0};
@@ -207,64 +47,6 @@ void DMA_Tx_Init_ADC(DMA_Channel_TypeDef *DMA_CHx, u32 ppadr, u32 memadr, u16 bu
   DMA_InitStructure.DMA_Priority           = DMA_Priority_Medium;
   DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;
   DMA_Init(DMA_CHx, &DMA_InitStructure);
-}
-
-/*********************************************************************
- * @fn      DMA_Rx_Init
- *
- * @brief   Initializes the DMAy Channelx configuration.
- *
- * @param   DMA_CHx - x can be 1 to 7.
- *          ppadr - Peripheral base address.
- *          memadr - Memory base address.
- *          bufsize - DMA channel buffer size.
- *
- * @return  none
- */
-void DMA_Rx_Init(DMA_Channel_TypeDef *DMA_CHx, u32 ppadr, u32 memadr, u16 bufsize)
-{
-  DMA_InitTypeDef DMA_InitStructure = {0};
-
-  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-
-  DMA_DeInit(DMA_CHx);
-
-  DMA_InitStructure.DMA_PeripheralBaseAddr = ppadr;
-  DMA_InitStructure.DMA_MemoryBaseAddr     = memadr;
-  DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralSRC;
-  DMA_InitStructure.DMA_BufferSize         = bufsize;
-  DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
-  DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;
-  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-  DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
-  DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;
-  DMA_InitStructure.DMA_Priority           = DMA_Priority_Medium;
-  DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;
-  DMA_Init(DMA_CHx, &DMA_InitStructure);
-}
-
-/**
- * @brief 重新启动SPI和DMA，关闭ADC，初始化摇杆，供后续模式切换使用
- */
-xdata void Roller_Init()
-{
-  SPI_FullDuplex_Init();
-  DMA_Tx_Init(DMA1_Channel5, (u32) & (SPI2->DATAR), (u32)TxData, DATA_LEN);
-  DMA_Rx_Init(DMA1_Channel4, (u32) & (SPI2->DATAR), (u32)&EncoderData, DATA_LEN);
-
-  GPIO_SetBits(GPIOB, GPIO_Pin_12);
-
-  DMA_Cmd(DMA1_Channel5, ENABLE);
-  DMA_Cmd(DMA1_Channel4, ENABLE);
-
-  // 禁用ADC和对应DMA通道
-
-  ADC_DMACmd(ADC1, DISABLE);
-  ADC_Cmd(ADC1, DISABLE);
-
-  DMA_Cmd(DMA1_Channel1, DISABLE);
-
-  rollerMode = ROLLER_MODE_TEST;
 }
 
 xdata void Roller_ADC_Init()
@@ -306,87 +88,37 @@ xdata void Roller_ADC_Init()
   DMA_Cmd(DMA1_Channel1, ENABLE);
 }
 
-// 重新读取编码器值
+xdata void Roller_Init()
+{
+  Roller_ADC_Init();
+}
+
 void Roller_Update()
 {
-  switch (rollerMode) {
-    case ROLLER_MODE_TEST: { // 测试是否有SPI合法输入数据
-      if (EncoderData.angle_h == 0 && EncoderData.angle_l == 0 && EncoderData.status == 0 && EncoderData.crc == 0) {
-        // 输入不合法
-        rollerModeTestCount++;
-      } else {
-        // 输入合法
-        rollerModeTestCount--;
-      }
-      if (rollerModeTestCount == 0) {
-        // 如果合法次数超过阈值，说明接入了SPI编码器，则切换到SPI模式
-        rollerMode          = ROLLER_MODE_SPI;
-        rollerModeTestCount = 0;
-      } else if (rollerModeTestCount > 2 * ROLLER_MODE_TEST_LIMIT) {
-        // 如果不合法次数超过阈值，说明接入了ADC编码器，则切换到ADC模式
-        rollerMode          = ROLLER_MODE_ADC;
-        rollerModeTestCount = 0;
-        // 关闭SPI和对应DMA通道
-        SPI_Cmd(SPI2, DISABLE);
-        DMA_Cmd(DMA1_Channel5, DISABLE);
-        DMA_Cmd(DMA1_Channel4, DISABLE);
-        Roller_ADC_Init();
-      }
-      break;
-    }
-    case ROLLER_MODE_SPI: {
-      if ((!DMA_GetFlagStatus(DMA1_FLAG_TC5)) && (!DMA_GetFlagStatus(DMA1_FLAG_TC4))) {
-        return;
-      }
-
-      DMA_ClearFlag(DMA1_FLAG_TC5); // 清除传输完成标志
-      DMA_ClearFlag(DMA1_FLAG_TC4); // 清除传输完成标志
-
-      SPI_Cmd(SPI2, DISABLE);
-
-      if (EncoderData.crc == calcCRC8((uint8_t *)&(EncoderData.angle_h), 3, tableCRC)) {
-        EncoderValue = ((uint16_t)EncoderData.angle_h << 8 | (uint16_t)EncoderData.angle_l);
-      }
-
-      DMA_Cmd(DMA1_Channel5, DISABLE);
-      DMA_SetCurrDataCounter(DMA1_Channel5, DATA_LEN);
-      DMA_Cmd(DMA1_Channel5, ENABLE);
-
-      DMA_Cmd(DMA1_Channel4, DISABLE);
-      DMA_SetCurrDataCounter(DMA1_Channel4, DATA_LEN);
-      DMA_Cmd(DMA1_Channel4, ENABLE);
-
-      SPI_Cmd(SPI2, ENABLE);
-      break;
-    }
-    case ROLLER_MODE_ADC: {
-      if ((!DMA_GetFlagStatus(DMA1_FLAG_TC1))) {
-        return;
-      }
-      DMA_ClearFlag(DMA1_FLAG_TC1);
-
-      uint8_t i;
-      uint32_t sum1 = 0;
-      uint32_t sum2 = 0;
-      for (i = 0; i < ADC_VALID_SAMPLES; i++) {
-        sum1 += ADCValue[(ADC_DISCARD_SAMPLES + i) * 2];
-        sum2 += ADCValue[(ADC_DISCARD_SAMPLES + i) * 2 + 1];
-      }
-
-      EncoderValue = (sum1 >> 6);
-      EncoderValue = ~EncoderValue;
-      EncoderValue <<= 4;
-
-      ADCValue2 = (sum2 >> 6);
-
-      DMA_Cmd(DMA1_Channel1, DISABLE);
-      DMA_SetCurrDataCounter(DMA1_Channel1, ADC_TOTAL_SAMPLES * 2);
-      DMA_Cmd(DMA1_Channel1, ENABLE);
-      break;
-    }
-    default:
-      break;
+  if (!DMA_GetFlagStatus(DMA1_FLAG_TC1)) {
+    return;
   }
+  DMA_ClearFlag(DMA1_FLAG_TC1);
+
+  uint8_t i;
+  uint32_t sum1 = 0;
+  uint32_t sum2 = 0;
+  for (i = 0; i < ADC_VALID_SAMPLES; i++) {
+    sum1 += ADCValue[(ADC_DISCARD_SAMPLES + i) * 2];
+    sum2 += ADCValue[(ADC_DISCARD_SAMPLES + i) * 2 + 1];
+  }
+
+  EncoderValue = (sum1 >> 6);
+  EncoderValue = ~EncoderValue;
+  EncoderValue <<= 4;
+
+  EncoderValue2 = (sum2 >> 6);
+  EncoderValue2 = ~EncoderValue2;
+  EncoderValue2 <<= 4;
+
+  DMA_Cmd(DMA1_Channel1, DISABLE);
+  DMA_SetCurrDataCounter(DMA1_Channel1, ADC_TOTAL_SAMPLES * 2);
+  DMA_Cmd(DMA1_Channel1, ENABLE);
 }
 
 uint16_t Roller_GetRawValue()
@@ -394,59 +126,58 @@ uint16_t Roller_GetRawValue()
   return EncoderValue;
 }
 
-uint16_t Roller_GetADC2Value()
+uint16_t Roller_GetRawValue2()
 {
-  return ADCValue2;
+  return EncoderValue2;
 }
 
-#define DEBOUNCE_LENGTH  8      // 滑动窗口大小
-#define DEBOUNCE_LIMIT_A 0x0100 // 去抖阈值
-#define DEBOUNCE_LIMIT_B 0x0040 // 滤波后的去抖阈值
-
-// 获取经过OFFSET处理并去抖后的编码器值
-uint16_t Roller_GetValue()
+static uint16_t applyOffsetDebounce(uint16_t rawVal, DebounceState *state)
 {
-  static uint16_t outputValue                     = 0;
-  static uint16_t debounceBuffer[DEBOUNCE_LENGTH] = {0};
-  static uint32_t debounceSumValue                = 0;
-  static uint16_t debounceAvgValue                = 0;
-  static uint8_t debounceIndex                    = 0;
-
-  uint16_t rawVal     = Roller_GetRawValue();
   uint8_t refreshFlag = 0;
 
-  if ((rawVal > debounceAvgValue ? rawVal - debounceAvgValue : debounceAvgValue - rawVal) > DEBOUNCE_LIMIT_A) {
+  if ((rawVal > state->debounceAvgValue ? rawVal - state->debounceAvgValue : state->debounceAvgValue - rawVal) > DEBOUNCE_LIMIT_A) {
     refreshFlag = 1;
   }
   if (refreshFlag == 1) {
     for (uint8_t i = 0; i < DEBOUNCE_LENGTH; i++) {
-      debounceBuffer[i] = rawVal;
+      state->debounceBuffer[i] = rawVal;
     }
-    debounceAvgValue = rawVal;
-    debounceSumValue = rawVal * DEBOUNCE_LENGTH;
+    state->debounceAvgValue  = rawVal;
+    state->debounceSumValue  = rawVal * DEBOUNCE_LENGTH;
   } else {
-    debounceSumValue -= debounceBuffer[debounceIndex];
-    debounceBuffer[debounceIndex] = rawVal;
-    debounceSumValue += rawVal;
-    debounceIndex    = (debounceIndex + 1) % DEBOUNCE_LENGTH;
-    debounceAvgValue = debounceSumValue / DEBOUNCE_LENGTH;
+    state->debounceSumValue -= state->debounceBuffer[state->debounceIndex];
+    state->debounceBuffer[state->debounceIndex] = rawVal;
+    state->debounceSumValue += rawVal;
+    state->debounceIndex    = (state->debounceIndex + 1) % DEBOUNCE_LENGTH;
+    state->debounceAvgValue = state->debounceSumValue / DEBOUNCE_LENGTH;
   }
-  if ((outputValue > debounceAvgValue ? outputValue - debounceAvgValue : debounceAvgValue - outputValue) > DEBOUNCE_LIMIT_B) {
-    outputValue = debounceAvgValue;
+  if ((state->outputValue > state->debounceAvgValue ? state->outputValue - state->debounceAvgValue : state->debounceAvgValue - state->outputValue) > DEBOUNCE_LIMIT_B) {
+    state->outputValue = state->debounceAvgValue;
   }
 
   uint16_t finalOutputValue;
 
-  if (outputValue <= VALUE_OFFSET_MASK - _offset) {
-    finalOutputValue = outputValue + _offset;
+  if (state->outputValue <= VALUE_OFFSET_MASK - _offset) {
+    finalOutputValue = state->outputValue + _offset;
   } else {
-    finalOutputValue = ((_offset + outputValue) & VALUE_OFFSET_MASK);
+    finalOutputValue = ((_offset + state->outputValue) & VALUE_OFFSET_MASK);
   }
 
   return finalOutputValue;
 }
 
-// 重设Offset，使经过Offset处理后的编码器值为 0x8000
+uint16_t Roller_GetValue()
+{
+  static DebounceState state = {0};
+  return applyOffsetDebounce(Roller_GetRawValue(), &state);
+}
+
+uint16_t Roller_GetValue2()
+{
+  static DebounceState state = {0};
+  return applyOffsetDebounce(Roller_GetRawValue2(), &state);
+}
+
 void Roller_ResetOffset()
 {
   uint16_t newVal;
