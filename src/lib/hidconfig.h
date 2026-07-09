@@ -25,9 +25,6 @@ typedef enum {
   RELOAD_DATA = 0x80,
   SAVE_DATA   = 0x81,
 
-  SLEEP_SET_TIMEOUT = 0x90,
-  SLEEP_GET_TIMEOUT = 0x91,
-
   ROLLER_SET_OFFSET = 0xA0,
   ROLLER_GET_DATA   = 0xA1,
 
@@ -52,10 +49,6 @@ typedef struct {
     struct
     {
       uint8_t device_mode;
-    };
-    struct
-    {
-      uint32_t sleep_timeout;
     };
     struct {
       uint16_t roller_value;

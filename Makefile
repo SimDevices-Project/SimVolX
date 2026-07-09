@@ -86,7 +86,6 @@ C_SOURCES = \
 	src/lib/ledmanager.c \
 	src/lib/pwm.c \
 	src/lib/roller.c \
-	src/lib/sleep.c \
 	src/lib/timeout.c \
 	src/lib/uart.c \
 	src/main.c \

@@ -1,6 +1,5 @@
 #include "led.h"
 #include "timeout.h"
-#include "sleep.h"
 #include "ledmanager.h"
 
 #define WS2812_FREQ         800000
@@ -197,9 +196,6 @@ xdata void LED_Init()
 {
   LED_Init_RGB();
   PWM_Init();
-
-  Sleep_RegisterSleep(LED_Effect_Close);
-  Sleep_RegisterWakeup(LED_Animation_PowerOn);
 }
 
 void LED_Refresh()

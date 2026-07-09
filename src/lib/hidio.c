@@ -2,7 +2,6 @@
 #include "led.h"
 #include "keyscan.h"
 #include "roller.h"
-#include "sleep.h"
 #include "string.h"
 #include "data.h"
 
@@ -85,7 +84,6 @@ void HIDIO_Receive_Handler()
       break;
     }
   }
-  Sleep_Alive();
 }
 
 uint8_t HIDIO_SGIO4_Upload()
@@ -238,7 +236,6 @@ void HIDIO_Update()
 
   if (freshRequired) {
     freshRequired = 0;
-    Sleep_Alive();
     switch (GlobalData->DeviceMode) {
       case 1:
         HIDIO_SGIO4_FreshData();

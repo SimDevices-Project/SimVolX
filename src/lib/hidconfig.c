@@ -84,21 +84,6 @@ void HIDCONFIG_Receive_Handler()
           HIDCONFIG_Upload();
           break;
         }
-        case SLEEP_SET_TIMEOUT: {
-          GlobalData->SleepTimeout = dataReceive->sleep_timeout;
-          dataUpload->command      = SLEEP_SET_TIMEOUT;
-          dataUpload->state        = STATE_OK;
-          HIDCONFIG_Upload();
-          break;
-        }
-        case SLEEP_GET_TIMEOUT: {
-          dataUpload->sleep_timeout = GlobalData->SleepTimeout;
-          dataUpload->command       = SLEEP_GET_TIMEOUT;
-          dataUpload->state         = STATE_OK;
-          dataUpload->sleep_timeout = GlobalData->SleepTimeout;
-          HIDCONFIG_Upload();
-          break;
-        }
         case ROLLER_GET_DATA: {
           uint16_t rollerValue    = Roller_GetValue();
           uint16_t rollerRawValue = Roller_GetRawValue();

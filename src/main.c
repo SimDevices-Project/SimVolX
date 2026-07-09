@@ -11,7 +11,6 @@
 #include "led.h"
 #include "hidio.h"
 #include "uart.h"
-#include "sleep.h"
 
 #include "usb_lib.h"
 
@@ -38,7 +37,6 @@ int main(void)
   Delay_Ms(10);
 
   Timeout_Init();
-  Sleep_Init();
 
   LED_Init();
   HIDIO_Init();
