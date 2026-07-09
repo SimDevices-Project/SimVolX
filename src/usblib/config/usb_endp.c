@@ -1,14 +1,3 @@
-/********************************** (C) COPYRIGHT *******************************
- * File Name          : usb_endp.c
- * Author             : WCH
- * Version            : V1.0.0
- * Date               : 2021/08/08
- * Description        : Endpoint routines
- *********************************************************************************
- * Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
- * Attention: This software (modified or not) and binary are used for
- * microcontroller manufactured by Nanjing Qinheng Microelectronics.
- *******************************************************************************/
 #include "usb_lib.h"
 #include "usb_desc.h"
 #include "usb_mem.h"
@@ -17,29 +6,19 @@
 #include "usb_pwr.h"
 #include "usb_prop.h"
 
-#include "cdc.h"
-
 #include "hidio.h"
 #include "hidconfig.h"
 
-/*********************************************************************
- * @fn      EP1_IN_Callback
- *
- * @brief  Endpoint 1 IN.
- *
- * @return  none
- */
+uint8_t HID2_Buffer_OUT[64] = {0x00};
+uint8_t HID2_Buffer_IN[64]  = {0x00};
+
+uint8_t HID3_Buffer_OUT[64] = {0x00};
+uint8_t HID3_Buffer_IN[64]  = {0x00};
+
 void EP1_IN_Callback(void)
 {
 }
 
-/*********************************************************************
- * @fn      EP1_OUT_Callback
- *
- * @brief  Endpoint 1 OUT.
- *
- * @return  none
- */
 void EP1_OUT_Callback(void)
 {
   if (USB_SIL_Read(EP1_OUT, HID_Buffer_OUT) == ENDP1_PACKET_SIZE) {
@@ -48,24 +27,10 @@ void EP1_OUT_Callback(void)
   SetEPRxValid(ENDP1);
 }
 
-/*********************************************************************
- * @fn      EP4_IN_Callback
- *
- * @brief  Endpoint 4 IN.
- *
- * @return  none
- */
 void EP4_IN_Callback(void)
 {
 }
 
-/*********************************************************************
- * @fn      EP4_OUT_Callback
- *
- * @brief  Endpoint 4 OUT.
- *
- * @return  none
- */
 void EP4_OUT_Callback(void)
 {
   if (USB_SIL_Read(EP4_OUT, HIDCFG_Buffer_OUT) == ENDP4_PACKET_SIZE) {
@@ -73,95 +38,27 @@ void EP4_OUT_Callback(void)
   }
   SetEPRxValid(ENDP4);
 }
-/*********************************************************************
- * @fn      EP2_OUT_Callback
- *
- * @brief  Endpoint 2 OUT.
- *
- * @return  none
- */
-void EP2_OUT_Callback(void)
-{
-  cdc_led_io.Rx_Pending = (uint8_t)USB_SIL_Read(EP2_OUT, cdc_led_io.Rx_PendingBuf);
-  cdc_led_io.Rx_CurPos  = 0;
 
-  SetEPRxStatus(CDC_LED_IO_EP, EP_RX_NAK);
-}
-
-/*********************************************************************
- * @fn      EP2_IN_Callback
- *
- * @brief  Endpoint 2 IN.
- *
- * @return  none
- */
 void EP2_IN_Callback(void)
 {
-  if (_GetEPTxCount(CDC_LED_IO_EP) == ENDP2_PACKET_SIZE) {
-    // 当还有数据未发送时，继续发送包
-    if (cdc_led_io.Tx_Full || cdc_led_io.PutCharBuff_First != cdc_led_io.PutCharBuff_Last) {
-      SetEPTxStatus(CDC_LED_IO_EP, EP_TX_NAK);
-      // CDC_Check();
-    } else {
-      // 发送一个ZLP 0长度包，通知包已发送完毕
-      USB_SIL_Write(0x80 | CDC_LED_IO_EP, 0, 0);
-    }
-  } else {
-    // 标记NAK状态，停止传输
-    SetEPTxStatus(CDC_LED_IO_EP, EP_TX_NAK);
-  }
 }
 
-/*********************************************************************
- * @fn      EP3_OUT_Callback
- *
- * @brief  Endpoint 3 OUT.
- *
- * @return  none
- */
-void EP3_OUT_Callback(void)
+void EP2_OUT_Callback(void)
 {
-  cdc_card_io.Rx_Pending = (uint8_t)USB_SIL_Read(EP3_OUT, cdc_card_io.Rx_PendingBuf);
-  cdc_card_io.Rx_CurPos  = 0;
-
-  SetEPRxStatus(CDC_CARD_IO_EP, EP_RX_NAK);
+  USB_SIL_Read(EP2_OUT, HID2_Buffer_OUT);
+  SetEPRxValid(ENDP2);
 }
 
-/*********************************************************************
- * @fn      EP3_IN_Callback
- *
- * @brief  Endpoint 3 IN.
- *
- * @return  none
- */
 void EP3_IN_Callback(void)
 {
-  if (_GetEPTxCount(CDC_CARD_IO_EP) == ENDP3_PACKET_SIZE) {
-    // 当还有数据未发送时，继续发送包
-    if (cdc_card_io.Tx_Full || cdc_card_io.PutCharBuff_First != cdc_card_io.PutCharBuff_Last) {
-      SetEPTxStatus(CDC_CARD_IO_EP, EP_TX_NAK);
-      // CDC_Check();
-    } else {
-      // 发送一个ZLP 0长度包，通知包已发送完毕
-      USB_SIL_Write(0x80 | CDC_CARD_IO_EP, 0, 0);
-    }
-  } else {
-    // 标记NAK状态，停止传输
-    SetEPTxStatus(CDC_CARD_IO_EP, EP_TX_NAK);
-  }
 }
 
-/*********************************************************************
- * @fn      USBD_ENDPx_DataUp
- *
- * @brief  USBD ENDPx DataUp Function
- *
- * @param   endp - endpoint num.
- *          *pbuf - A pointer points to data.
- *          len - data length to transmit.
- *
- * @return  data up status.
- */
+void EP3_OUT_Callback(void)
+{
+  USB_SIL_Read(EP3_OUT, HID3_Buffer_OUT);
+  SetEPRxValid(ENDP3);
+}
+
 uint8_t USBD_ENDPx_DataUp(uint8_t endp, uint8_t *pbuf, uint16_t len)
 {
   switch (endp) {

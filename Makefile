@@ -78,19 +78,17 @@ C_SOURCES = \
 	sdk/Peripheral/src/ch32v20x_usart.c \
 	sdk/Peripheral/src/ch32v20x_wwdg.c \
 	src/ch32v20x_it.c \
-	src/lib/cdc.c \
-	src/lib/ch422.c \
 	src/lib/data.c \
 	src/lib/hidconfig.c \
 	src/lib/hidio.c \
 	src/lib/keyscan.c \
 	src/lib/led.c \
-	src/lib/pn532.c \
-	src/lib/pn532_uart.c \
-	src/lib/roller.c \
-	src/lib/timeout.c \
-	src/lib/sleep.c \
 	src/lib/ledmanager.c \
+	src/lib/pwm.c \
+	src/lib/roller.c \
+	src/lib/sleep.c \
+	src/lib/timeout.c \
+	src/lib/uart.c \
 	src/main.c \
 	src/system_ch32v20x.c \
 	src/usblib/config/hw_config.c \
@@ -188,12 +186,12 @@ $(ELF_FILE): $(OBJS) Makefile
 # Compilation
 $(OBJ_DIR)/%.o: %.c Makefile
 	@echo compiling $< ...
-	@mkdir -p $(dir $@)
+	@-mkdir $(subst /,\,$(dir $@))
 	$(Q)$(CC) -c $(CFLAGS) -o $@ -MMD $<
 
 $(OBJ_DIR)/%.o: %.S Makefile
 	@echo assembling $< ...
-	@mkdir -p $(dir $@)
+	@-mkdir $(subst /,\,$(dir $@))
 	$(Q)$(AS) -c $(ASFLAGS) -o $@ -MMD $<
 
 # Create binary files

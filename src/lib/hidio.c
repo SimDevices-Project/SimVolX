@@ -6,8 +6,6 @@
 #include "string.h"
 #include "data.h"
 
-// #include "debug.h"
-
 #include "timeout.h"
 
 #include "usb_lib.h"
@@ -42,12 +40,9 @@ uint8_t intervalID = 0xFF;
 #define INTERVAL_HEARTBEAT_MS_IDLE   30
 #define INTERVAL_HEARTBEAT_MS_ACTIVE 6
 
-const uint8_t bitPosMap[] = {23, 20, 22, 19, 21, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6};
-
 void HIDIO_Receive_Handler()
 {
   switch (dataReceive->reportID) {
-    // Default HIDIO
     case 0x10:
       switch (dataReceive->command) {
         case SET_COMM_TIMEOUT: {
@@ -71,13 +66,14 @@ void HIDIO_Receive_Handler()
           break;
         }
         case SET_GENERAL_OUTPUT: {
-          uint32_t raw_led_dat = (uint32_t)(dataReceive->payload[0]) << 16 | (uint32_t)(dataReceive->payload[1]) << 8 | dataReceive->payload[2];
-          // uint32_t ch422_dat   = 0;
-          for (uint8_t i = 0; i < 3; i++) {
-            LED_7C_Set(i * 2, (raw_led_dat >> bitPosMap[9 + i * 3]) & 1, (raw_led_dat >> bitPosMap[9 + i * 3 + 1]) & 1, (raw_led_dat >> bitPosMap[9 + i * 3 + 2]) & 1);
-            LED_7C_Set(i * 2 + 1, (raw_led_dat >> bitPosMap[i * 3]) & 1, (raw_led_dat >> bitPosMap[i * 3 + 1]) & 1, (raw_led_dat >> bitPosMap[i * 3 + 2]) & 1);
+          uint8_t led_bits = dataReceive->payload[0];
+          for (uint8_t i = 0; i < PWM_LED_COUNT; i++) {
+            if (led_bits & (1 << i)) {
+              LED_PWM_SetBrightness(i, PWM_MAX_BRIGHTNESS);
+            } else {
+              LED_PWM_SetBrightness(i, 0);
+            }
           }
-          // CH422_Set(ch422_dat);
           break;
         }
         default: {
@@ -99,8 +95,8 @@ uint8_t HIDIO_SGIO4_Upload()
   return USBD_ENDPx_DataUp(OUT_EP, HID_Buffer_IN, 64);
 }
 
-volatile static uint8_t kbdUploadState   = 0; // 0: 发送键盘, 1: 发送鼠标
-volatile static uint8_t kbdUploadPending = 0; // 键盘发送状态
+volatile static uint8_t kbdUploadState   = 0;
+volatile static uint8_t kbdUploadPending = 0;
 volatile static uint8_t spMseChanged     = 0;
 
 uint8_t HIDIO_KBD_Upload()
@@ -163,7 +159,7 @@ void HIDIO_Upload()
   }
   if (usbResult != USB_SUCCESS) {
     clearTimeout(timeoutID);
-    timeoutID = setTimeout(HIDIO_Upload, 1); // 重试上传
+    timeoutID = setTimeout(HIDIO_Upload, 1);
   }
 }
 
@@ -176,29 +172,23 @@ void HIDIO_SGIO4_Heartbeat()
 
 void HIDIO_SGIO4_FreshData()
 {
-  // Roller
   dataUpload->analog[0] = activeRollerValue;
 
-  // Buttons
   dataUpload->buttons[0] = 0x00;
   dataUpload->buttons[1] = 0x00;
   dataUpload->buttons[2] = 0x00;
   dataUpload->buttons[3] = 0x00;
 
-  for (uint8_t i = 0; i < KEY_COUNT - 1; i++) {
+  for (uint8_t i = 0; i < KEY_COUNT; i++) {
+    if (i == KEY_COIN_INDEX) {
+      continue;
+    }
     if (KeyScan_GetKeyDebouncedStatus(i)) {
       dataUpload->buttons[hid_key_map[i][0]] |= hid_key_map[i][1];
     }
   }
 
-  // 仅早于 v3.8 的主控版本需要取反
-#ifdef EARLY_HARDWARE
-  dataUpload->buttons[3] ^= 0x80; // Lside取反
-  dataUpload->buttons[1] ^= 0x40; // Rside取反
-#endif
-
-  // Coin
-  if ((changedKeyStatus & (1 << (KEY_COUNT - 1))) && KeyScan_GetKeyDebouncedStatus(KEY_COUNT - 1)) {
+  if ((changedKeyStatus & (1 << KEY_COIN_INDEX)) && KeyScan_GetKeyDebouncedStatus(KEY_COIN_INDEX)) {
     dataUpload->coin[0].count++;
     dataUpload->coin[1].count++;
   }
@@ -207,8 +197,8 @@ void HIDIO_SGIO4_FreshData()
 void HIDIO_KBD_FreshData()
 {
   static uint16_t prevSpMseX = 0;
-  // Roller
-  spMseData->x =  (uint16_t)(~activeRollerValue) >> 1;
+
+  spMseData->x = (uint16_t)(~activeRollerValue) >> 1;
 
   if (spMseData->x != prevSpMseX) {
     spMseChanged = 1;
@@ -217,28 +207,14 @@ void HIDIO_KBD_FreshData()
   }
   prevSpMseX = spMseData->x;
 
-  // Buttons
   memset(kbdData, 0x00, sizeof(KbdData));
   kbdData->reportID = 0x31;
 
   for (uint8_t i = 0; i < KEY_COUNT; i++) {
-    if (i == 0x04 || i == 0x09) {
-      // RSide 和 LSide 需要特殊处理
-      continue;
-    }
     if (KeyScan_GetKeyDebouncedStatus(i)) {
       kbdData->ctrlkey |= kbd_key_map[i][0];
       kbdData->keymap[i] = kbd_key_map[i][1];
     }
-  }
-  // RSide 和 LSide 特殊处理
-  if (!KeyScan_GetKeyDebouncedStatus(0x04)) {
-    kbdData->ctrlkey |= kbd_key_map[0x04][0];
-    kbdData->keymap[0x04] = kbd_key_map[0x04][1];
-  }
-  if (!KeyScan_GetKeyDebouncedStatus(0x09)) {
-    kbdData->ctrlkey |= kbd_key_map[0x09][0];
-    kbdData->keymap[0x09] = kbd_key_map[0x09][1];
   }
 }
 
@@ -286,10 +262,6 @@ xdata void HIDIO_Init()
   dataUpload->reportID = 0x01;
 
   dataUpload->analog[0] = 0x8000;
-  // dataForUpload->rotary[0]    = 0x8100;
-  dataUpload->buttons[1] = 0x40;
-  dataUpload->buttons[3] = 0x80;
-  // dataForUpload->systemStatus = 0x02;
   dataUpload->systemStatus = 0x30;
 
   HIDIO_SGIO4_FreshData();

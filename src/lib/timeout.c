@@ -15,35 +15,34 @@ Timer_TypeDef timeout[MAX_TIMER_COUNT]  = {0};
 
 volatile uint32_t timerSet = 0;
 
-xdata void Timer4_Config(void)
+xdata void Timer2_Config(void)
 {
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
   TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
   TIM_TimeBaseStructure.TIM_Period        = 1000 - 1;
   TIM_TimeBaseStructure.TIM_Prescaler     = TIMER_CLOCK_FREQ / 1000000 - 1;
   TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
   TIM_TimeBaseStructure.TIM_CounterMode   = TIM_CounterMode_Up;
-  TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStructure);
+  TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
   NVIC_InitTypeDef NVIC_InitStructure;
-  NVIC_InitStructure.NVIC_IRQChannel                   = TIM4_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannel                   = TIM2_IRQn;
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 15;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority        = 15;
   NVIC_InitStructure.NVIC_IRQChannelCmd                = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 
-  TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
-  TIM_Cmd(TIM4, ENABLE);
+  TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+  TIM_Cmd(TIM2, ENABLE);
 }
 
-void TIM4_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
-void TIM4_IRQHandler(void)
+void TIM2_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void TIM2_IRQHandler(void)
 {
-  if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET) {
-    TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
+  if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {
+    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
     timerSet += 1;
-    // TIM_SetCounter(TIM4, 0);
   }
 }
 
@@ -107,10 +106,10 @@ void resetInterval(uint8_t id)
 
 void Timer_Process()
 {
-  TIM_ITConfig(TIM4, TIM_IT_Update, DISABLE);
+  TIM_ITConfig(TIM2, TIM_IT_Update, DISABLE);
   uint32_t timerSetRec = timerSet;
   timerSet = 0;
-  TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+  TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
   uint8_t i;
   for (i = 0; i < MAX_TIMER_COUNT; i++) {
     if (interval[i].callback == NULL) {
@@ -137,5 +136,5 @@ void Timer_Process()
 
 xdata void Timeout_Init()
 {
-  Timer4_Config();
+  Timer2_Config();
 }

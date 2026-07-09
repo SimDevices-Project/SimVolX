@@ -1,5 +1,4 @@
 #include "led.h"
-#include "ch422.h"
 #include "timeout.h"
 #include "sleep.h"
 #include "ledmanager.h"
@@ -16,11 +15,8 @@
 #define TIMER_PER_BUFF_SIZE (BUFF_FRONT_OFFSET + RGB_COUNT_PER_PORT * 24 + BUFF_END_OFFSET)
 #define TIMER_PERIOD        ((TIMER_CLOCK_FREQ / WS2812_FREQ) - 1)
 
-uint32_t colorList[RGB_PORT_COUNT][RGB_COUNT_PER_PORT] = {0}; // GRB format
-uint8_t colorPWM[RGB_PORT_COUNT][TIMER_PER_BUFF_SIZE]  = {0}; // GRB format in 24 bits
-
-uint32_t colorRawCh422                    = 0;
-uint8_t colorListCh422[RGB_7COLORS_COUNT] = {0};
+uint32_t colorList[RGB_PORT_COUNT][RGB_COUNT_PER_PORT] = {0};
+uint8_t colorPWM[RGB_PORT_COUNT][TIMER_PER_BUFF_SIZE]  = {0};
 
 void setRgbColor32(uint8_t port, uint8_t index, uint32_t color)
 {
@@ -54,64 +50,41 @@ void setRgbColorPort(uint8_t port, uint8_t r, uint8_t g, uint8_t b)
   }
 }
 
-xdata void Timer3_Config(void)
+xdata void Timer4_Config(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
   DMA_InitTypeDef DMA_InitStructure;
 
-  // 使能外部时钟
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
   RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
 
-  // 引脚配置 RGB1 RGB2
-  GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_1 | GPIO_Pin_0;
+  GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_7 | GPIO_Pin_8;
   GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
   GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-  // 引脚配置 RGB EX
-  GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_6;
-  GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
+  TIM_InternalClockConfig(TIM4);
 
-  // 时钟源配置
-  TIM_InternalClockConfig(TIM3); // 内部时钟模式
+  TIM_PrescalerConfig(TIM4, 0, TIM_PSCReloadMode_Immediate);
+  TIM_CounterModeConfig(TIM4, TIM_CounterMode_Up);
+  TIM_SetAutoreload(TIM4, TIMER_PERIOD);
+  TIM_SetClockDivision(TIM4, TIM_CKD_DIV1);
 
-  // 时基单元配置
-  TIM_PrescalerConfig(TIM3, 0, TIM_PSCReloadMode_Immediate); // 设置预分频器
-  TIM_CounterModeConfig(TIM3, TIM_CounterMode_Up);           // 计数模式
-  TIM_SetAutoreload(TIM3, TIMER_PERIOD);                     // 自动重装载值
-  TIM_SetClockDivision(TIM3, TIM_CKD_DIV1);                  // 时钟滤波器值
+  TIM_OC2PolarityConfig(TIM4, TIM_OCPolarity_High);
+  TIM_OC2PreloadConfig(TIM4, TIM_OCPreload_Enable);
 
-  // 输出通道配置
-  TIM_OC4PolarityConfig(TIM3, TIM_OCPolarity_High); // 设置输出极性
-  TIM_OC4PreloadConfig(TIM3, TIM_OCPreload_Enable); // 必须要手动使能CCR寄存器的影子寄存器（类似缓冲器）的功能（默认不使能）
+  TIM_OC3PolarityConfig(TIM4, TIM_OCPolarity_High);
+  TIM_OC3PreloadConfig(TIM4, TIM_OCPreload_Enable);
 
-  TIM_OC3PolarityConfig(TIM3, TIM_OCPolarity_High); // 设置输出极性
-  TIM_OC3PreloadConfig(TIM3, TIM_OCPreload_Enable); // 必须要手动使能CCR寄存器的影子寄存器（类似缓冲器）的功能（默认不使能）
+  TIM_SetCompare2(TIM4, 0);
+  TIM_SelectOCxM(TIM4, TIM_Channel_2, TIM_OCMode_PWM1);
+  TIM_CCxCmd(TIM4, TIM_Channel_2, TIM_CCx_Enable);
 
-  TIM_OC1PolarityConfig(TIM3, TIM_OCPolarity_High); // 设置输出极性
-  TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable); // 必须要手动使能CCR寄存器的影子寄存器（类似缓冲器）的功能（默认不使能）
+  TIM_SetCompare3(TIM4, 0);
+  TIM_SelectOCxM(TIM4, TIM_Channel_3, TIM_OCMode_PWM1);
+  TIM_CCxCmd(TIM4, TIM_Channel_3, TIM_CCx_Enable);
 
-  // // RGB 0, PB1 Channel4
-  TIM_SetCompare4(TIM3, 0);                             // 设置比较值
-  TIM_SelectOCxM(TIM3, TIM_Channel_4, TIM_OCMode_PWM1); // 设置输出通道模式
-  TIM_CCxCmd(TIM3, TIM_Channel_4, TIM_CCx_Enable);      // 使能输出通道
-
-  // RGB 1, PB0 Channel3
-  TIM_SetCompare3(TIM3, 0);                             // 设置比较值
-  TIM_SelectOCxM(TIM3, TIM_Channel_3, TIM_OCMode_PWM1); // 设置输出通道模式
-  TIM_CCxCmd(TIM3, TIM_Channel_3, TIM_CCx_Enable);      // 使能输出通道
-
-  // RGB EX, PA6 Channel1
-  TIM_SetCompare1(TIM3, 90);                            // 设置比较值
-  TIM_SelectOCxM(TIM3, TIM_Channel_1, TIM_OCMode_PWM1); // 设置输出通道模式
-  TIM_CCxCmd(TIM3, TIM_Channel_1, TIM_CCx_Enable);      // 使能输出通道
-
-  // DMA配置
   DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
   DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
   DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
@@ -122,63 +95,42 @@ xdata void Timer3_Config(void)
   DMA_InitStructure.DMA_Priority           = DMA_Priority_High;
   DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;
 
-  // RGB 0, PB1 Tim3, Channel4, DMA1, Channel3
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(TIM3->CH4CVR);
-  DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)colorPWM[0];
-  DMA_Init(DMA1_Channel3, &DMA_InitStructure);
-  DMA_Cmd(DMA1_Channel3, ENABLE);
-
-  // RGB 1, PB0 Channel3, DMA1, Channel2
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(TIM3->CH3CVR);
-  DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)colorPWM[1];
+  // LED_LEFT (PB7), TIM4 CH2, DMA1 Channel2
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(TIM4->CH2CVR);
+  DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)colorPWM[LED_LEFT];
   DMA_Init(DMA1_Channel2, &DMA_InitStructure);
   DMA_Cmd(DMA1_Channel2, ENABLE);
 
-  // RGB EX, PA6 Channel1, DMA1, Channel6
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(TIM3->CH1CVR);
-  DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)colorPWM[2];
-  DMA_Init(DMA1_Channel6, &DMA_InitStructure);
-  DMA_Cmd(DMA1_Channel6, ENABLE);
+  // LED_RIGHT (PB8), TIM4 CH3, DMA1 Channel3
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(TIM4->CH3CVR);
+  DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)colorPWM[LED_RIGHT];
+  DMA_Init(DMA1_Channel3, &DMA_InitStructure);
+  DMA_Cmd(DMA1_Channel3, ENABLE);
 
-  // 使能定时器
-  TIM_DMACmd(TIM3, TIM_DMA_CC4 | TIM_DMA_CC3 | TIM_DMA_CC1, ENABLE);
-  TIM_Cmd(TIM3, ENABLE); // 使能定时器3
+  TIM_DMACmd(TIM4, TIM_DMA_CC2 | TIM_DMA_CC3, ENABLE);
+  TIM_Cmd(TIM4, ENABLE);
 }
 
 void WS2812_Refresh()
 {
-  // 如果DMA繁忙，则拒绝本次刷新
-  if (DMA_GetFlagStatus(DMA1_FLAG_TC3) == RESET) { return; }
   if (DMA_GetFlagStatus(DMA1_FLAG_TC2) == RESET) { return; }
-  if (DMA_GetFlagStatus(DMA1_FLAG_TC6) == RESET) { return; }
+  if (DMA_GetFlagStatus(DMA1_FLAG_TC3) == RESET) { return; }
 
-  DMA_ClearFlag(DMA1_FLAG_TC3); // 清除传输完成标志
-  DMA_ClearFlag(DMA1_FLAG_TC2); // 清除传输完成标志
-  DMA_ClearFlag(DMA1_FLAG_TC6); // 清除传输完成标志
+  DMA_ClearFlag(DMA1_FLAG_TC2);
+  DMA_ClearFlag(DMA1_FLAG_TC3);
 
-  TIM_Cmd(TIM3, DISABLE);
+  TIM_Cmd(TIM4, DISABLE);
 
-  DMA_Cmd(DMA1_Channel3, DISABLE);
   DMA_Cmd(DMA1_Channel2, DISABLE);
-  DMA_Cmd(DMA1_Channel6, DISABLE);
-
-  // RGB0 （PB1）
-
-  DMA_SetCurrDataCounter(DMA1_Channel3, TIMER_PER_BUFF_SIZE);
-
-  // RGB1 （PB0）
+  DMA_Cmd(DMA1_Channel3, DISABLE);
 
   DMA_SetCurrDataCounter(DMA1_Channel2, TIMER_PER_BUFF_SIZE);
-
-  // RGBEX （PA6）
-
-  DMA_SetCurrDataCounter(DMA1_Channel6, TIMER_PER_BUFF_SIZE);
+  DMA_SetCurrDataCounter(DMA1_Channel3, TIMER_PER_BUFF_SIZE);
 
   DMA_Cmd(DMA1_Channel2, ENABLE);
   DMA_Cmd(DMA1_Channel3, ENABLE);
-  DMA_Cmd(DMA1_Channel6, ENABLE);
 
-  TIM_Cmd(TIM3, ENABLE);
+  TIM_Cmd(TIM4, ENABLE);
 }
 
 xdata void WS2812_Init(void)
@@ -188,7 +140,7 @@ xdata void WS2812_Init(void)
     colorPWM[i][TIMER_PER_BUFF_SIZE - 1] = 0;
   }
 
-  Timer3_Config();
+  Timer4_Config();
 }
 
 xdata void LED_Init_RGB()
@@ -198,92 +150,38 @@ xdata void LED_Init_RGB()
 
 xdata void LED_Effect_Red()
 {
-  LED_7C_Set(LED_7C_L1, LED_ON, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_L2, LED_ON, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_L3, LED_ON, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_R1, LED_ON, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_R2, LED_ON, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_R3, LED_ON, LED_OFF, LED_OFF);
-
-  LED_RGB_SetPort(LED_RGB_PORT_LEFT, 0xFF, 0x00, 0x00);
-  LED_RGB_SetPort(LED_RGB_PORT_RIGHT, 0xFF, 0x00, 0x00);
-
-  LED_RGB_SetPort(LED_RGB_PORT_UART, 0xFF, 0x00, 0x00);
+  LED_RGB_SetPort(LED_LEFT, 0xFF, 0x00, 0x00);
+  LED_RGB_SetPort(LED_RIGHT, 0xFF, 0x00, 0x00);
 }
 
 xdata void LED_Effect_Green()
 {
-  LED_7C_Set(LED_7C_L1, LED_OFF, LED_ON, LED_OFF);
-  LED_7C_Set(LED_7C_L2, LED_OFF, LED_ON, LED_OFF);
-  LED_7C_Set(LED_7C_L3, LED_OFF, LED_ON, LED_OFF);
-  LED_7C_Set(LED_7C_R1, LED_OFF, LED_ON, LED_OFF);
-  LED_7C_Set(LED_7C_R2, LED_OFF, LED_ON, LED_OFF);
-  LED_7C_Set(LED_7C_R3, LED_OFF, LED_ON, LED_OFF);
-
-  LED_RGB_SetPort(LED_RGB_PORT_LEFT, 0x00, 0xFF, 0x00);
-  LED_RGB_SetPort(LED_RGB_PORT_RIGHT, 0x00, 0xFF, 0x00);
-
-  LED_RGB_SetPort(LED_RGB_PORT_UART, 0x00, 0xFF, 0x00);
+  LED_RGB_SetPort(LED_LEFT, 0x00, 0xFF, 0x00);
+  LED_RGB_SetPort(LED_RIGHT, 0x00, 0xFF, 0x00);
 }
 
 xdata void LED_Effect_Blue()
 {
-  LED_7C_Set(LED_7C_L1, LED_OFF, LED_OFF, LED_ON);
-  LED_7C_Set(LED_7C_L2, LED_OFF, LED_OFF, LED_ON);
-  LED_7C_Set(LED_7C_L3, LED_OFF, LED_OFF, LED_ON);
-  LED_7C_Set(LED_7C_R1, LED_OFF, LED_OFF, LED_ON);
-  LED_7C_Set(LED_7C_R2, LED_OFF, LED_OFF, LED_ON);
-  LED_7C_Set(LED_7C_R3, LED_OFF, LED_OFF, LED_ON);
-
-  LED_RGB_SetPort(LED_RGB_PORT_LEFT, 0x00, 0x00, 0xFF);
-  LED_RGB_SetPort(LED_RGB_PORT_RIGHT, 0x00, 0x00, 0xFF);
-
-  LED_RGB_SetPort(LED_RGB_PORT_UART, 0x00, 0x00, 0xFF);
+  LED_RGB_SetPort(LED_LEFT, 0x00, 0x00, 0xFF);
+  LED_RGB_SetPort(LED_RIGHT, 0x00, 0x00, 0xFF);
 }
 
 xdata void LED_Effect_White()
 {
-  LED_7C_Set(LED_7C_L1, LED_ON, LED_ON, LED_ON);
-  LED_7C_Set(LED_7C_L2, LED_ON, LED_ON, LED_ON);
-  LED_7C_Set(LED_7C_L3, LED_ON, LED_ON, LED_ON);
-  LED_7C_Set(LED_7C_R1, LED_ON, LED_ON, LED_ON);
-  LED_7C_Set(LED_7C_R2, LED_ON, LED_ON, LED_ON);
-  LED_7C_Set(LED_7C_R3, LED_ON, LED_ON, LED_ON);
-
-  LED_RGB_SetPort(LED_RGB_PORT_LEFT, 0xFF, 0xFF, 0xFF);
-  LED_RGB_SetPort(LED_RGB_PORT_RIGHT, 0xFF, 0xFF, 0xFF);
-
-  LED_RGB_SetPort(LED_RGB_PORT_UART, 0xFF, 0xFF, 0xFF);
+  LED_RGB_SetPort(LED_LEFT, 0xFF, 0xFF, 0xFF);
+  LED_RGB_SetPort(LED_RIGHT, 0xFF, 0xFF, 0xFF);
 }
 
 xdata void LED_Effect_Normal()
 {
-  LED_7C_Set(LED_7C_L1, LED_ON, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_L2, LED_OFF, LED_ON, LED_OFF);
-  LED_7C_Set(LED_7C_L3, LED_OFF, LED_OFF, LED_ON);
-  LED_7C_Set(LED_7C_R1, LED_ON, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_R2, LED_OFF, LED_ON, LED_OFF);
-  LED_7C_Set(LED_7C_R3, LED_OFF, LED_OFF, LED_ON);
-
-  LED_RGB_SetPort(LED_RGB_PORT_LEFT, 0xFF, 0x00, 0xFF);
-  LED_RGB_SetPort(LED_RGB_PORT_RIGHT, 0xFF, 0x00, 0xFF);
-
-  LED_RGB_SetPort(LED_RGB_PORT_UART, 0x00, 0x00, 0x00);
+  LED_RGB_SetPort(LED_LEFT, 0xFF, 0x00, 0xFF);
+  LED_RGB_SetPort(LED_RIGHT, 0xFF, 0x00, 0xFF);
 }
 
 xdata void LED_Effect_Close()
 {
-  LED_7C_Set(LED_7C_L1, LED_OFF, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_L2, LED_OFF, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_L3, LED_OFF, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_R1, LED_OFF, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_R2, LED_OFF, LED_OFF, LED_OFF);
-  LED_7C_Set(LED_7C_R3, LED_OFF, LED_OFF, LED_OFF);
-
-  LED_RGB_SetPort(LED_RGB_PORT_LEFT, 0x00, 0x00, 0x00);
-  LED_RGB_SetPort(LED_RGB_PORT_RIGHT, 0x00, 0x00, 0x00);
-
-  LED_RGB_SetPort(LED_RGB_PORT_UART, 0x00, 0x00, 0x00);
+  LED_RGB_SetPort(LED_LEFT, 0x00, 0x00, 0x00);
+  LED_RGB_SetPort(LED_RIGHT, 0x00, 0x00, 0x00);
 }
 
 xdata void LED_Animation_PowerOn()
@@ -298,7 +196,7 @@ xdata void LED_Animation_PowerOn()
 xdata void LED_Init()
 {
   LED_Init_RGB();
-  CH422_Init();
+  PWM_Init();
 
   Sleep_RegisterSleep(LED_Effect_Close);
   Sleep_RegisterWakeup(LED_Animation_PowerOn);
@@ -308,42 +206,24 @@ void LED_Refresh()
 {
   LEDManager_Handle();
   WS2812_Refresh();
-  CH422_Refresh();
 }
 
 void LED_RGB_Set(LED_RGB_Port port, uint8_t index, uint8_t r, uint8_t g, uint8_t b)
 {
   setRgbColor(port, index, r, g, b);
-  // setTimeout(LED_Refresh, 0);
 }
 
 void LED_RGB_SetAll(uint8_t r, uint8_t g, uint8_t b)
 {
   setRgbColorAll(r, g, b);
-  // setTimeout(LED_Refresh, 0);
 }
 
 void LED_RGB_SetPort(LED_RGB_Port port, uint8_t r, uint8_t g, uint8_t b)
 {
   setRgbColorPort(port, r, g, b);
-  // setTimeout(LED_Refresh, 0);
 }
 
-void updateColorRawCh422()
+void LED_PWM_SetBrightness(PwmLedIndex led, uint16_t brightness)
 {
-  colorRawCh422 = 0;
-  for (uint8_t i = 0; i < RGB_7COLORS_COUNT; i++) {
-    colorRawCh422 |= (uint32_t)(colorListCh422[i]) << ((RGB_7COLORS_COUNT - 1 - i) * 3);
-  }
-  CH422_Set(colorRawCh422);
-}
-
-void LED_7C_Set(LED_7C_Tag index, LED_State r, LED_State g, LED_State b)
-{
-  uint8_t color = 0;
-  color |= (r ? 1 : 0) << 2;
-  color |= (g ? 1 : 0) << 1;
-  color |= (b ? 1 : 0);
-  colorListCh422[index] = color;
-  updateColorRawCh422();
+  PWM_SetBrightness(led, brightness);
 }

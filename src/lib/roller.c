@@ -30,7 +30,8 @@ uint8_t rollerModeTestCount = ROLLER_MODE_TEST_LIMIT;
 
 int16_t Calibrattion_Val = 0;
 
-uint16_t ADCValue[72] = {0}; // ADC采样值，前8次采样会被丢弃，只保留64次有效采样值
+uint16_t ADCValue[ADC_TOTAL_SAMPLES * 2] = {0};
+uint16_t ADCValue2 = 0;
 
 const uint8_t TxData[DATA_LEN] = {0x05, 0x00};
 struct rxdata_t {
@@ -242,24 +243,6 @@ void DMA_Rx_Init(DMA_Channel_TypeDef *DMA_CHx, u32 ppadr, u32 memadr, u16 bufsiz
   DMA_Init(DMA_CHx, &DMA_InitStructure);
 }
 
-/*********************************************************************
- * @fn      Get_ADC_ConversionVal
- *
- * @brief   Get Conversion Value.
- *
- * @param   val - Sampling value
- *
- * @return  val+Calibrattion_Val - Conversion Value.
- */
-uint16_t Get_ADC_ConversionVal(int16_t val)
-{
-  if ((val + Calibrattion_Val) < 0 || val == 0)
-    return 0;
-  if ((Calibrattion_Val + val) > 4095 || val == 4095)
-    return 4095;
-  return (val + Calibrattion_Val);
-}
-
 /**
  * @brief 重新启动SPI和DMA，关闭ADC，初始化摇杆，供后续模式切换使用
  */
@@ -289,40 +272,35 @@ xdata void Roller_ADC_Init()
   ADC_InitTypeDef ADC_InitStructure   = {0};
   GPIO_InitTypeDef GPIO_InitStructure = {0};
 
-  // 使能GPIOA和ADC1外设时钟
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
   RCC_ADCCLKConfig(RCC_PCLK2_Div8);
 
-  // 将PA5配置为模拟输入，供ADC采集使用
-  GPIO_InitStructure.GPIO_Pin  = GPIO_Pin_5;
+  GPIO_InitStructure.GPIO_Pin  = GPIO_Pin_5 | GPIO_Pin_3;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
   GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-  // ADC1初始化配置：独立模式、单通道连续转换，软件触发转换，数据右对齐
   ADC_InitStructure.ADC_Mode               = ADC_Mode_Independent;
-  ADC_InitStructure.ADC_ScanConvMode       = DISABLE;                   // 单通道模式
-  ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;                    // 连续转换模式
-  ADC_InitStructure.ADC_ExternalTrigConv   = ADC_ExternalTrigConv_None; // 软件触发
+  ADC_InitStructure.ADC_ScanConvMode       = ENABLE;
+  ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
+  ADC_InitStructure.ADC_ExternalTrigConv   = ADC_ExternalTrigConv_None;
   ADC_InitStructure.ADC_DataAlign          = ADC_DataAlign_Right;
-  ADC_InitStructure.ADC_NbrOfChannel       = 1;
+  ADC_InitStructure.ADC_NbrOfChannel       = 2;
   ADC_Init(ADC1, &ADC_InitStructure);
 
-  // 配置ADC1规则组通道5（对应PA5）
   ADC_RegularChannelConfig(ADC1, ADC_Channel_5, 1, ADC_SampleTime_55Cycles5);
+  ADC_RegularChannelConfig(ADC1, ADC_Channel_3, 2, ADC_SampleTime_55Cycles5);
 
-  // 使能ADC1
   ADC_DMACmd(ADC1, ENABLE);
   ADC_Cmd(ADC1, ENABLE);
 
-  ADC_BufferCmd(ADC1, DISABLE); // 禁用缓冲区
-  ADC_ResetCalibration(ADC1);   // 复位校准
+  ADC_BufferCmd(ADC1, DISABLE);
+  ADC_ResetCalibration(ADC1);
   while (ADC_GetResetCalibrationStatus(ADC1));
-  ADC_StartCalibration(ADC1); // 启动校准
+  ADC_StartCalibration(ADC1);
   while (ADC_GetCalibrationStatus(ADC1));
-  Calibrattion_Val = Get_CalibrationValue(ADC1); // 获取校准值
 
-  DMA_Tx_Init_ADC(DMA1_Channel1, (u32)&ADC1->RDATAR, (u32)&ADCValue, ADC_TOTAL_SAMPLES);
+  DMA_Tx_Init_ADC(DMA1_Channel1, (u32)&ADC1->RDATAR, (u32)&ADCValue, ADC_TOTAL_SAMPLES * 2);
   ADC_SoftwareStartConvCmd(ADC1, ENABLE);
 
   DMA_Cmd(DMA1_Channel1, ENABLE);
@@ -385,22 +363,24 @@ void Roller_Update()
       if ((!DMA_GetFlagStatus(DMA1_FLAG_TC1))) {
         return;
       }
-      DMA_ClearFlag(DMA1_FLAG_TC1); // 清除传输完成标志
+      DMA_ClearFlag(DMA1_FLAG_TC1);
 
       uint8_t i;
-      uint32_t sum = 0;
-      for (i = ADC_DISCARD_SAMPLES; i < ADC_TOTAL_SAMPLES; i++) {
-        sum += ADCValue[i];
+      uint32_t sum1 = 0;
+      uint32_t sum2 = 0;
+      for (i = 0; i < ADC_VALID_SAMPLES; i++) {
+        sum1 += ADCValue[(ADC_DISCARD_SAMPLES + i) * 2];
+        sum2 += ADCValue[(ADC_DISCARD_SAMPLES + i) * 2 + 1];
       }
 
-      // 读取ADC值（后64个有效样本平均）
-      EncoderValue = Get_ADC_ConversionVal(sum >> 6);
-      EncoderValue = ~EncoderValue; // 取反以符合编码器方向
+      EncoderValue = (sum1 >> 6);
+      EncoderValue = ~EncoderValue;
       EncoderValue <<= 4;
 
-      // 重新开始ADC转换
+      ADCValue2 = (sum2 >> 6);
+
       DMA_Cmd(DMA1_Channel1, DISABLE);
-      DMA_SetCurrDataCounter(DMA1_Channel1, ADC_TOTAL_SAMPLES);
+      DMA_SetCurrDataCounter(DMA1_Channel1, ADC_TOTAL_SAMPLES * 2);
       DMA_Cmd(DMA1_Channel1, ENABLE);
       break;
     }
@@ -409,10 +389,14 @@ void Roller_Update()
   }
 }
 
-// 获取原始编码器值
 uint16_t Roller_GetRawValue()
 {
   return EncoderValue;
+}
+
+uint16_t Roller_GetADC2Value()
+{
+  return ADCValue2;
 }
 
 #define DEBOUNCE_LENGTH  8      // 滑动窗口大小
@@ -422,19 +406,15 @@ uint16_t Roller_GetRawValue()
 // 获取经过OFFSET处理并去抖后的编码器值
 uint16_t Roller_GetValue()
 {
-  const uint8_t multiple = 3; // 缩放倍数
-
-  static uint16_t outputValue                     = 0;   // 滤波后的去抖值
-  static uint16_t debounceBuffer[DEBOUNCE_LENGTH] = {0}; // 滑动窗口
-  static uint32_t debounceSumValue                = 0;   // 滑动窗口和
-  static uint16_t debounceAvgValue                = 0;   // 滑动窗口平均值
-  static uint8_t debounceIndex                    = 0;   // 滑动窗口索引
+  static uint16_t outputValue                     = 0;
+  static uint16_t debounceBuffer[DEBOUNCE_LENGTH] = {0};
+  static uint32_t debounceSumValue                = 0;
+  static uint16_t debounceAvgValue                = 0;
+  static uint8_t debounceIndex                    = 0;
 
   uint16_t rawVal     = Roller_GetRawValue();
   uint8_t refreshFlag = 0;
 
-  // 去抖
-  // 如果当前值与平均值的差异超过阈值，则刷新整个滑动窗口，说明出现了大角度转动
   if ((rawVal > debounceAvgValue ? rawVal - debounceAvgValue : debounceAvgValue - rawVal) > DEBOUNCE_LIMIT_A) {
     refreshFlag = 1;
   }
@@ -451,60 +431,16 @@ uint16_t Roller_GetValue()
     debounceIndex    = (debounceIndex + 1) % DEBOUNCE_LENGTH;
     debounceAvgValue = debounceSumValue / DEBOUNCE_LENGTH;
   }
-  // 如果当前值与平均值的差异超过更严格的去抖阈值，才将当前值设置为平均值，说明出现了小角度转动，但不需要刷新整个窗口
   if ((outputValue > debounceAvgValue ? outputValue - debounceAvgValue : debounceAvgValue - outputValue) > DEBOUNCE_LIMIT_B) {
     outputValue = debounceAvgValue;
   }
 
-  uint16_t finalOutputValue; // 使用独立变量作为最终输出，避免与去抖部分的outputValue冲突
+  uint16_t finalOutputValue;
 
-  // offset 计算
   if (outputValue <= VALUE_OFFSET_MASK - _offset) {
     finalOutputValue = outputValue + _offset;
   } else {
     finalOutputValue = ((_offset + outputValue) & VALUE_OFFSET_MASK);
-  }
-
-  // 对finalOutputValue进行扩大处理
-  int32_t tmp = (int32_t)finalOutputValue - 0x8000; // 计算与0x8000的差值
-  tmp         = tmp * multiple;                     // 扩大multiple倍
-  tmp         = 0x8000 + tmp;                       // 计算扩大后的值
-
-  // 限制在有效范围内
-  uint16_t currentExpandedValue;
-  if (tmp > 0xFFFF) {
-    currentExpandedValue = 0xFFFF;
-  } else if (tmp < 0x0000) {
-    currentExpandedValue = 0x0000;
-  } else {
-    currentExpandedValue = (uint16_t)tmp;
-  }
-
-  // 对扩大后的数据进行插值处理，使数值更连续
-  static uint16_t lastExpandedValue = 0x8000; // 保存上次扩大后的值
-  static uint8_t firstTime          = 1;
-
-  if (firstTime) {
-    lastExpandedValue = currentExpandedValue;
-    firstTime         = 0;
-    finalOutputValue  = currentExpandedValue;
-  } else {
-    // 计算当前值与上次值的差异
-    uint16_t valueDiff = currentExpandedValue > lastExpandedValue ? currentExpandedValue - lastExpandedValue : lastExpandedValue - currentExpandedValue;
-
-    // 避免震荡的插值算法
-    if (valueDiff <= 8) {
-      // 差异很小，直接使用当前值避免震荡
-      finalOutputValue = currentExpandedValue;
-    } else if (valueDiff <= 64) {
-      // 小差异，温和插值
-      finalOutputValue = (uint16_t)(((uint32_t)lastExpandedValue + (uint32_t)currentExpandedValue) >> 1); // 1:1平均
-    } else {
-      // 大差异，快速收敛插值
-      finalOutputValue = (uint16_t)(((uint32_t)lastExpandedValue + (uint32_t)currentExpandedValue * 7) >> 3); // 1:7加权平均，快速向目标收敛
-    }
-
-    lastExpandedValue = currentExpandedValue; // 更新历史值为当前真实输入值，避免反馈循环
   }
 
   return finalOutputValue;
